@@ -24,7 +24,18 @@
 
 namespace paygw_stripe;
 
+/**
+ * The gateway class for Stripe payment gateway.
+ *
+ * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class gateway extends \core_payment\gateway {
+    /**
+     * The full list of currencies supported by Stripe regardless of account origin country.
+     *
+     * @return string[]
+     */
     public static function get_supported_currencies(): array {
         // Only certain currencies are supported based on the users account, but below are all the currencies that the plugin
         // can support as they are given in cents.

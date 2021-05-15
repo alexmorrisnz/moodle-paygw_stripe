@@ -30,11 +30,29 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 
+/**
+ * The helper class for Stripe payment gateway.
+ *
+ * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class stripe_helper {
 
+    /**
+     * @var StripeClient Secret API key (Do not publish).
+     */
     private $stripe;
+    /**
+     * @var string Public API key.
+     */
     private $apikey;
 
+    /**
+     * Initialise the Stripe API client.
+     *
+     * @param string $apikey
+     * @param string $secretkey
+     */
     public function __construct(string $apikey, string $secretkey) {
         $this->apikey = $apikey;
         $this->stripe = new StripeClient([
@@ -42,6 +60,19 @@ class stripe_helper {
         ]);
     }
 
+    /**
+     * Create a payment intent and return with the checkout session id.
+     *
+     * @param object $config
+     * @param string $currency
+     * @param string $description
+     * @param float $cost
+     * @param string $component
+     * @param string $paymentarea
+     * @param string $itemid
+     * @return string
+     * @throws \Stripe\Exception\ApiErrorException
+     */
     public function generate_payment(object $config, string $currency, string $description, float $cost, string $component,
             string $paymentarea, string $itemid): string {
         global $CFG;
@@ -67,9 +98,16 @@ class stripe_helper {
         return $checkoutsession->id;
     }
 
+    /**
+     * Check if a checkout session has been paid
+     *
+     * @param $sessionid
+     * @return bool
+     * @throws \Stripe\Exception\ApiErrorException
+     */
     public function is_paid($sessionid) {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
-        return $session->payment_status == 'paid';
+        return $session->payment_status === 'paid';
     }
 
 }
