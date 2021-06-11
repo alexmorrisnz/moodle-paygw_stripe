@@ -24,6 +24,7 @@
 
 namespace paygw_stripe;
 
+use Stripe\Stripe;
 use Stripe\StripeClient;
 
 defined('MOODLE_INTERNAL') || die();
@@ -58,6 +59,11 @@ class stripe_helper {
         $this->stripe = new StripeClient([
                 "api_key" => $secretkey
         ]);
+        Stripe::setAppInfo(
+            'Moodle Stripe Payment Gateway',
+            '1.2',
+            'https://github.com/alexmorrisnz/moodle-paygw_stripe'
+        );
     }
 
     /**
