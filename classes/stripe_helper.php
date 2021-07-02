@@ -24,6 +24,7 @@
 
 namespace paygw_stripe;
 
+use Stripe\Exception\ApiErrorException;
 use Stripe\Stripe;
 use Stripe\StripeClient;
 
@@ -77,7 +78,7 @@ class stripe_helper {
      * @param string $paymentarea
      * @param string $itemid
      * @return string
-     * @throws \Stripe\Exception\ApiErrorException
+     * @throws ApiErrorException
      */
     public function generate_payment(object $config, string $currency, string $description, float $cost, string $component,
             string $paymentarea, string $itemid): string {
@@ -109,9 +110,9 @@ class stripe_helper {
      *
      * @param $sessionid string stripe session ID
      * @return bool
-     * @throws \Stripe\Exception\ApiErrorException
+     * @throws ApiErrorException
      */
-    public function is_paid($sessionid) {
+    public function is_paid(string $sessionid) {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         return $session->payment_status === 'paid';
     }

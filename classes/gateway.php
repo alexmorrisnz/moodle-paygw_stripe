@@ -24,6 +24,9 @@
 
 namespace paygw_stripe;
 
+use core_payment\form\account_gateway;
+use stdClass;
+
 /**
  * The gateway class for Stripe payment gateway.
  *
@@ -55,9 +58,9 @@ class gateway extends \core_payment\gateway {
      *
      * Use $form->get_mform() to access the \MoodleQuickForm instance
      *
-     * @param \core_payment\form\account_gateway $form
+     * @param account_gateway $form
      */
-    public static function add_configuration_to_gateway_form(\core_payment\form\account_gateway $form): void {
+    public static function add_configuration_to_gateway_form(account_gateway $form): void {
         $mform = $form->get_mform();
 
         $mform->addElement('text', 'apikey', get_string('apikey', 'paygw_stripe'));
@@ -88,13 +91,13 @@ class gateway extends \core_payment\gateway {
     /**
      * Validates the gateway configuration form.
      *
-     * @param \core_payment\form\account_gateway $form
-     * @param \stdClass $data
+     * @param account_gateway $form
+     * @param stdClass $data
      * @param array $files
      * @param array $errors form errors (passed by reference)
      */
-    public static function validate_gateway_form(\core_payment\form\account_gateway $form,
-            \stdClass $data, array $files, array &$errors): void {
+    public static function validate_gateway_form(account_gateway $form,
+                                                 stdClass $data, array $files, array &$errors): void {
         if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
         }
