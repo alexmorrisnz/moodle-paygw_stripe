@@ -112,7 +112,8 @@ class stripe_helper {
      * @return bool
      * @throws ApiErrorException
      */
-    public function is_paid(string $sessionid) {
+    public function is_paid(string $sessionid): bool
+    {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         return $session->payment_status === 'paid';
     }
