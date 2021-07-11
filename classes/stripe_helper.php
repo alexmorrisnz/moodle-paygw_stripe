@@ -58,7 +58,7 @@ class stripe_helper {
     public function __construct(string $apikey, string $secretkey) {
         $this->apikey = $apikey;
         $this->stripe = new StripeClient([
-                "api_key" => $secretkey
+            "api_key" => $secretkey
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
@@ -81,26 +81,27 @@ class stripe_helper {
      * @throws ApiErrorException
      */
     public function generate_payment(object $config, string $currency, string $description, float $cost, string $component,
-            string $paymentarea, string $itemid): string {
+        string $paymentarea, string $itemid): string {
         global $CFG;
         $price = $this->stripe->prices->create([
-                'currency' => strtolower($currency),
-                'product_data' => [
-                        'name' => $description
-                ],
-                'unit_amount' => $cost * 100
+            'currency' => strtolower($currency),
+            'product_data' => [
+                'name' => $description
+            ],
+            'unit_amount' => $cost * 100
         ]);
         $checkoutsession = $this->stripe->checkout->sessions->create([
-                'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
-                        $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
-                        $paymentarea . '&itemid=' . $itemid,
-                'payment_method_types' => $config->paymentmethods,
-                'mode' => 'payment',
-                'line_items' => [[
-                        'price' => $price,
-                        'quantity' => 1
-                ]]
+            'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
+                $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
+                $paymentarea . '&itemid=' . $itemid,
+            'payment_method_types' => $config->paymentmethods,
+            'mode' => 'payment',
+            'line_items' => [[
+                'price' => $price,
+                'quantity' => 1
+            ]],
+            'allow_promotion_codes' => $config->allowpromotioncodes == 1,
         ]);
         return $checkoutsession->id;
     }
@@ -108,12 +109,11 @@ class stripe_helper {
     /**
      * Check if a checkout session has been paid
      *
-     * @param $sessionid string stripe session ID
+     * @param $sessionid string Stripe session ID
      * @return bool
      * @throws ApiErrorException
      */
-    public function is_paid(string $sessionid): bool
-    {
+    public function is_paid(string $sessionid): bool {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         return $session->payment_status === 'paid';
     }

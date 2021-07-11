@@ -43,7 +43,7 @@ $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 $sessionid = $stripehelper->generate_payment($config, $payable->get_currency(), $description, $cost, $component,
-$paymentarea, $itemid);
+    $paymentarea, $itemid);
 
 ?>
 <!DOCTYPE html>

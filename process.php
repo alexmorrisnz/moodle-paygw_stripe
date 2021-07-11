@@ -45,7 +45,7 @@ if ($stripehelper->is_paid($sessionid)) {
     $payable = helper::get_payable($component, $paymentarea, $itemid);
     $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), helper::get_gateway_surcharge('stripe'));
     $paymentid = helper::save_payment($payable->get_account_id(), $component, $paymentarea,
-            $itemid, $USER->id, $cost, $payable->get_currency(), 'stripe');
+        $itemid, $USER->id, $cost, $payable->get_currency(), 'stripe');
     helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $USER->id);
 
     // Find redirection.

@@ -25,7 +25,6 @@
 namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
-use stdClass;
 
 /**
  * The gateway class for Stripe payment gateway.
@@ -43,13 +42,13 @@ class gateway extends \core_payment\gateway {
         // Only certain currencies are supported based on the users account, but below are all the currencies that the plugin
         // can support as they are given in cents.
         return [
-                'USD', 'AED', 'ALL', 'AMD', 'ANG', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BIF', 'BMD', 'BND', 'BSD',
-                'BWP', 'BZD', 'CAD', 'CDF', 'CHF', 'CNY', 'DKK', 'DOP', 'DZD', 'EGP', 'ETB', 'EUR', 'FJD', 'GBP', 'GEL', 'GIP',
-                'GMD', 'GYD', 'HKD', 'HRK', 'HTG', 'IDR', 'ILS', 'ISK', 'JMD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KRW', 'KYD',
-                'KZT', 'LBP', 'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRO', 'MVR', 'MWK', 'MXN',
-                'MYR', 'MZN', 'NAD', 'NGN', 'NOK', 'NPR', 'NZD', 'PGK', 'PHP', 'PKR', 'PLN', 'QAR', 'RON', 'RSD', 'RUB', 'RWF',
-                'SAR', 'SBD', 'SCR', 'SEK', 'SGD', 'SLL', 'SOS', 'SZL', 'THB', 'TJS', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH',
-                'UGX', 'UZS', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'YER', 'ZAR', 'INR'
+            'USD', 'AED', 'ALL', 'AMD', 'ANG', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BIF', 'BMD', 'BND', 'BSD',
+            'BWP', 'BZD', 'CAD', 'CDF', 'CHF', 'CNY', 'DKK', 'DOP', 'DZD', 'EGP', 'ETB', 'EUR', 'FJD', 'GBP', 'GEL', 'GIP',
+            'GMD', 'GYD', 'HKD', 'HRK', 'HTG', 'IDR', 'ILS', 'ISK', 'JMD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KRW', 'KYD',
+            'KZT', 'LBP', 'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRO', 'MVR', 'MWK', 'MXN',
+            'MYR', 'MZN', 'NAD', 'NGN', 'NOK', 'NPR', 'NZD', 'PGK', 'PHP', 'PKR', 'PLN', 'QAR', 'RON', 'RSD', 'RUB', 'RWF',
+            'SAR', 'SBD', 'SCR', 'SEK', 'SGD', 'SLL', 'SOS', 'SZL', 'THB', 'TJS', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH',
+            'UGX', 'UZS', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'YER', 'ZAR', 'INR'
         ];
     }
 
@@ -72,32 +71,37 @@ class gateway extends \core_payment\gateway {
         $mform->addHelpButton('secretkey', 'secretkey', 'paygw_stripe');
 
         $paymentmethods = [
-                'card' => 'Card',
-                'alipay' => 'Alipay',
-                'bancontact' => 'Bancontact',
-                'eps' => 'EPS',
-                'giropay' => 'giropay',
-                'ideal' => 'iDEAL',
-                'p24' => 'P24',
-                'sepa_debit' => 'SEPA Direct Debit',
-                'sofort' => 'Sofort',
+            'card' => get_string('paymentmethod:card', 'paygw_stripe'),
+            'alipay' => get_string('paymentmethod:alipay', 'paygw_stripe'),
+            'bancontact' => get_string('paymentmethod:bancontact', 'paygw_stripe'),
+            'eps' => get_string('paymentmethod:eps', 'paygw_stripe'),
+            'giropay' => get_string('paymentmethod:giropay', 'paygw_stripe'),
+            'ideal' => get_string('paymentmethod:ideal', 'paygw_stripe'),
+            'p24' => get_string('paymentmethod:p24', 'paygw_stripe'),
+            'sepa_debit' => get_string('paymentmethod:sepa_debit', 'paygw_stripe'),
+            'sofort' => get_string('paymentmethod:sofort', 'paygw_stripe'),
+            'upi' => get_string('paymentmethod:upi', 'paygw_stripe'),
+            'netbanking' => get_string('paymentmethod:netbanking', 'paygw_stripe')
         ];
-        $method = $mform->addElement('select', 'paymentmethods', 'Payment Methods', $paymentmethods);
+        $method = $mform->addElement('select', 'paymentmethods', get_string('paymentmethods', 'paygw_stripe'), $paymentmethods);
         $mform->setType('paymentmethods', PARAM_TEXT);
         $mform->setDefault('paymentmethods', 'card');
         $method->setMultiple(true);
+
+        $mform->addElement('advcheckbox', 'allowpromotioncodes', get_string('allowpromotioncodes', 'paygw_stripe'));
+        $mform->setDefault('allowpromotioncodes', true);
     }
 
     /**
      * Validates the gateway configuration form.
      *
      * @param account_gateway $form
-     * @param stdClass $data
+     * @param \stdClass $data
      * @param array $files
      * @param array $errors form errors (passed by reference)
      */
     public static function validate_gateway_form(account_gateway $form,
-                                                 stdClass $data, array $files, array &$errors): void {
+        \stdClass $data, array $files, array &$errors): void {
         if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
         }
