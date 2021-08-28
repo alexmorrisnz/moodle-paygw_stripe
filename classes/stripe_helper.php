@@ -251,7 +251,7 @@ class stripe_helper {
     /**
      * Check if a checkout session has been paid
      *
-     * @param $sessionid string Stripe session ID
+     * @param string $sessionid Stripe session ID
      * @return bool
      * @throws ApiErrorException
      */
