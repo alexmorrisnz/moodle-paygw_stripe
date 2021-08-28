@@ -93,11 +93,11 @@ jobs:
         run: moodle-plugin-ci phpunit
 
       - name: Run privacy tests
-          if: ${{ always() }}
-          run: |
-            cd moodle
-            vendor/bin/phpunit --fail-on-risky --disallow-test-output -v admin/tool/dataprivacy/tests/metadata_registry_test.php
-            vendor/bin/phpunit --fail-on-risky --disallow-test-output -v privacy/tests/provider_test.php
+        if: ${{ always() }}
+        run: |
+          cd moodle
+          vendor/bin/phpunit --fail-on-risky --disallow-test-output -v admin/tool/dataprivacy/tests/metadata_registry_test.php
+          vendor/bin/phpunit --fail-on-risky --disallow-test-output -v privacy/tests/provider_test.php
 
       - name: Run behat
         if: ${{ always() }}
