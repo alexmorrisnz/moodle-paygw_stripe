@@ -1,4 +1,4 @@
-name: master branch test
+name: 3.10+ branch test
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -99,11 +99,8 @@ jobs:
 
       - name: Run phpunit
         if: ${{ always() }}
-        run: |
-          moodle-plugin-ci phpunit
-          cd moodle
-          vendor/bin/phpunit --fail-on-risky --disallow-test-output --filter tool_dataprivacy_metadata_registry_testcase
-          vendor/bin/phpunit --fail-on-risky --disallow-test-output --testsuite core_privacy_testsuite --filter provider_testcase
+        run: moodle-plugin-ci phpunit
+
       - name: Run behat
         if: ${{ always() }}
         run: moodle-plugin-ci behat --profile chrome
