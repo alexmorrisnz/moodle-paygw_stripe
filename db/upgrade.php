@@ -14,9 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * Upgrade script for paygw_stripe.
+ *
+ * @package    paygw_stripe
+ * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
 /**
+ * Upgrade the plugin.
+ *
  * @param int $oldversion the version we are upgrading from
  * @return bool result
  */

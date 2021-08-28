@@ -210,7 +210,7 @@ class stripe_helper {
             ]);
         } else {
             if ($price->unit_amount != $cost * 100 || $price->currency != $currency) {
-                // We cannot update the price or currency, so we must create a price
+                // We cannot update the price or currency, so we must create a new price.
                 $price->updateAttributes(['active' => false]);
                 $price->save();
                 $price = $this->stripe->prices->create([
