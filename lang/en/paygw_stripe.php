@@ -24,7 +24,6 @@
 
 $string['pluginname'] = 'Stripe';
 $string['pluginname_desc'] = 'The Stripe plugin allows you to receive payments via Stripe.';
-$string['privacy:metadata'] = 'The Stripe plugin does not store any personal data.';
 $string['gatewayname'] = 'Stripe';
 $string['apikey'] = 'API Key';
 $string['apikey_help'] = 'The API key that we use to identifier ourselves with Stripe';
@@ -50,3 +49,7 @@ $string['paymentmethod:sepa_debit'] = 'SEPA Direct Debit';
 $string['paymentmethod:sofort'] = 'Sofort';
 $string['paymentmethod:upi'] = 'UPI';
 $string['paymentmethod:netbanking'] = 'NetBanking';
+
+$string['privacy:metadata:stripe_customers'] = 'Stores the relation from Moodle users to Stripe customer objects';
+$string['privacy:metadata:stripe_customers:userid'] = 'Moodle user ID';
+$string['privacy:metadata:stripe_customers:customerid'] = 'Customer ID returned from Stripe';
