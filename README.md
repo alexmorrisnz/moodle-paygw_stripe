@@ -7,8 +7,9 @@ Provides a payment gateway with Stripe in Moodle
 1. Install the plugin
 2. Register for Stripe
 3. Grab your Stripe API and Secret keys
-4. Configure the Stripe payment gateway in Moodle with those keys
+4. Configure the Stripe payment account in Moodle with those keys and your payment method
 5. Add 'Enrolment on payment' to the Moodle courses that you want
+6. Configure the enrolment method with the currency you want to use
 
 ## Details
 
@@ -26,5 +27,7 @@ This plugin can be used with these payment gateways:
 * P24
 * SEPA Direct Debit
 * Sofort
+* UPI
+* NetBanking
 
 Some of those payment gateways will only work in Stripe if you have provided additional verification details.

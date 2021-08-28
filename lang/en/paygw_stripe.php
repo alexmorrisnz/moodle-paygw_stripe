@@ -37,6 +37,7 @@ $string['stripeaccount'] = 'Stripe account ID';
 $string['stripeaccount_help'] = 'For creating the direct charge branding page';
 $string['paymentsuccessful'] = 'Payment was successful. You are enrolled in the course.';
 $string['paymentcancelled'] = 'Payment was cancelled';
+$string['customerdescription'] = 'Moodle User ID: {$a}';
 
 $string['paymentmethod:card'] = 'Card';
 $string['paymentmethod:alipay'] = 'Alipay';
