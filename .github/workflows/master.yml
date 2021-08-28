@@ -1,8 +1,4 @@
-name: 3.10+ branch test
-
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
-# Run this workflow every time a new commit pushed to your repository
+name: 3.11+ branch test
 
 on: [push, pull_request]
 
@@ -28,13 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         database: ['pgsql']
-        moodle-branch: ['MOODLE_310_STABLE', 'MOODLE_311_STABLE', 'master']
-        php: ['7.2', '7.4']
-        exclude:
-          - moodle-branch: master
-            php: 7.2
-          - moodle-branch: MOODLE_311_STABLE
-            php: 7.2
+        moodle-branch: ['MOODLE_311_STABLE', 'master']
+        php: ['7.4']
 
     steps:
       - name: Check out repository code
@@ -100,6 +91,13 @@ jobs:
       - name: Run phpunit
         if: ${{ always() }}
         run: moodle-plugin-ci phpunit
+
+      - name: Run privacy tests
+          if: ${{ always() }}
+          run: |
+            cd moodle
+            vendor/bin/phpunit --fail-on-risky --disallow-test-output -v admin/tool/dataprivacy/tests/metadata_registry_test.php
+            vendor/bin/phpunit --fail-on-risky --disallow-test-output -v privacy/tests/provider_test.php
 
       - name: Run behat
         if: ${{ always() }}
