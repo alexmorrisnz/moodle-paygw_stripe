@@ -34,6 +34,12 @@ use core_privacy\local\metadata\collection;
  */
 class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\data_provider {
 
+    /**
+     * Returns metadata about this plugin.
+     *
+     * @param collection $collection The initialised collection to add items to.
+     * @return collection A listing of user data stored in this plugin.
+     */
     public static function get_metadata(collection $collection): collection {
         $collection->add_database_table(
             'paygw_stripe_customers',
