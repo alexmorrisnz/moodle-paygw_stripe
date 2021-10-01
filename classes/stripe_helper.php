@@ -87,6 +87,10 @@ class stripe_helper {
             try {
                 return $this->stripe->products->retrieve($record->productid);
             } catch (ApiErrorException $e) {
+                // Product exists in Moodle but not in stripe, possibly the keys were switched.
+                // Delete product for creation later.
+                $DB->delete_records('paygw_stripe_products',
+                    ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]);
                 return null;
             }
         }
@@ -155,6 +159,9 @@ class stripe_helper {
         try {
             return $this->stripe->customers->retrieve($record->customerid);
         } catch (ApiErrorException $e) {
+            // Customer exists in Moodle but not in stripe, possibly the keys were switched.
+            // Delete customer for creation later.
+            $DB->delete_records('paygw_stripe_customers', ['userid' => $userid]);
             return null;
         }
     }
