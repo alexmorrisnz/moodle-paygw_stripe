@@ -37,6 +37,13 @@ $string['stripeaccount_help'] = 'For creating the direct charge branding page';
 $string['paymentsuccessful'] = 'Payment was successful. You are enrolled in the course.';
 $string['paymentcancelled'] = 'Payment was cancelled';
 $string['customerdescription'] = 'Moodle User ID: {$a}';
+$string['enableautomatictax'] = 'Enable automatic tax';
+$string['enableautomatictax_desc'] = 'Automatic tax must be enabled and configured in the Stripe dashboard.';
+$string['defaulttaxbehavior'] = 'Default tax behavior';
+$string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclusive). Changeable in Stripe dashboard.';
+
+$string['taxbehavior:exclusive'] = 'Exclusive';
+$string['taxbehavior:inclusive'] = 'Inclusive';
 
 $string['paymentmethod:card'] = 'Card';
 $string['paymentmethod:alipay'] = 'Alipay';

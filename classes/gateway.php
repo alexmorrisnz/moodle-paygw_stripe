@@ -90,6 +90,15 @@ class gateway extends \core_payment\gateway {
 
         $mform->addElement('advcheckbox', 'allowpromotioncodes', get_string('allowpromotioncodes', 'paygw_stripe'));
         $mform->setDefault('allowpromotioncodes', true);
+
+        $mform->addElement('advcheckbox', 'enableautomatictax', get_string('enableautomatictax', 'paygw_stripe'),
+            get_string('enableautomatictax_desc', 'paygw_stripe'));
+
+        $mform->addElement('select', 'defaulttaxbehavior', get_string('defaulttaxbehavior', 'paygw_stripe'), [
+            'exclusive' => get_string('taxbehavior:exclusive', 'paygw_stripe'),
+            'inclusive' => get_string('taxbehavior:inclusive', 'paygw_stripe'),
+        ]);
+        $mform->addHelpButton('defaulttaxbehavior', 'defaulttaxbehavior', 'paygw_stripe');
     }
 
     /**

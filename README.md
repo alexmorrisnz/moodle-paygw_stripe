@@ -16,6 +16,8 @@ Provides a payment gateway with Stripe in Moodle
 Stripe offers 106+ currencies however certain payment gateways only support a subset of those.  
 E.g. Alipay only supports CNY and NZD currencies.
 
+The plugin supports using promotion/coupon codes and automatic tax calculation.
+
 This plugin can be used with these payment gateways:
 
 * Card

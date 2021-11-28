@@ -145,6 +145,28 @@ class stripe_helper {
     }
 
     /**
+     * Create a price against an associated product.
+     *
+     * @param string $currency Currency
+     * @param string $productid Product ID
+     * @param float $unitamount Price
+     * @param bool $automatictax Toggles insertion of a tax behavior
+     * @param string|null $defaultbehavior The default tax behavior for the price, if enabled
+     */
+    public function create_price(string $currency, string $productid, float $unitamount, bool $automatictax,
+        ?string $defaultbehavior) {
+        $pricedata = [
+            'currency' => $currency,
+            'product' => $productid,
+            'unit_amount' => $unitamount,
+        ];
+        if ($automatictax == 1) {
+            $pricedata['taxbehavior'] = $defaultbehavior ?? 'inclusive';
+        }
+        return $this->stripe->prices->create($pricedata);
+    }
+
+    /**
      * Get the stripe Customer object from the corresponding Moodle user id.
      *
      * @param int $userid
@@ -210,21 +232,20 @@ class stripe_helper {
             $product = $this->create_product($description, $component, $paymentarea, $itemid);
         }
         if (!$price = $this->get_price($product)) {
-            $price = $this->stripe->prices->create([
-                'currency' => $currency,
-                'product' => $product->id,
-                'unit_amount' => $cost * 100
-            ]);
+            $price = $this->create_price($currency, $product->id, $cost * 100, $config->enableautomatictax == 1,
+                $config->defaulttaxbehavior);
         } else {
             if ($price->unit_amount != $cost * 100 || $price->currency != $currency) {
                 // We cannot update the price or currency, so we must create a new price.
                 $price->updateAttributes(['active' => false]);
                 $price->save();
-                $price = $this->stripe->prices->create([
-                    'currency' => $currency,
-                    'product' => $product->id,
-                    'unit_amount' => $cost * 100
-                ]);
+                $price = $this->create_price($currency, $product->id, $cost * 100, $config->enableautomatictax == 1,
+                    $config->defaulttaxbehavior);
+            }
+            // Set tax behavior if not set already.
+            if ($config->enableautomatictax == 1 && (!isset($price->tax_behavior) || $price->tax_behavior === 'unspecified')) {
+                $price->updateAttributes(['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
+                $price->save();
             }
         }
 
@@ -243,6 +264,9 @@ class stripe_helper {
                 'price' => $price,
                 'quantity' => 1
             ]],
+            'automatic_tax' => [
+                'enabled' => $config->enableautomatictax == 1,
+            ],
             'customer' => $customer->id,
             'metadata' => [
                 'userid' => $USER->id,
@@ -251,6 +275,9 @@ class stripe_helper {
                 'lastname' => $USER->lastname,
             ],
             'allow_promotion_codes' => $config->allowpromotioncodes == 1,
+            'customer_update' => [
+                'address' => 'auto',
+            ],
         ]);
         return $checkoutsession->id;
     }
