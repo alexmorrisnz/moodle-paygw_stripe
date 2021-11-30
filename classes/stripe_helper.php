@@ -161,7 +161,7 @@ class stripe_helper {
             'unit_amount' => $unitamount,
         ];
         if ($automatictax == 1) {
-            $pricedata['taxbehavior'] = $defaultbehavior ?? 'inclusive';
+            $pricedata['tax_behavior'] = $defaultbehavior ?? 'inclusive';
         }
         return $this->stripe->prices->create($pricedata);
     }
