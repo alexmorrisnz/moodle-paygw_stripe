@@ -35,12 +35,14 @@ use core_payment\form\account_gateway;
 class gateway extends \core_payment\gateway {
     /**
      * The full list of currencies supported by Stripe regardless of account origin country.
+     * Only certain currencies are supported based on the users account, the plugin does not account for that
+     * when giving the list of supported currencies.
+     *
+     * {@link https://stripe.com/docs/currencies}
      *
      * @return string[]
      */
     public static function get_supported_currencies(): array {
-        // Only certain currencies are supported based on the users account, but below are all the currencies that the plugin
-        // can support as they are given in cents.
         return [
             'USD', 'AED', 'ALL', 'AMD', 'ANG', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BIF', 'BMD', 'BND', 'BSD',
             'BWP', 'BZD', 'CAD', 'CDF', 'CHF', 'CNY', 'DKK', 'DOP', 'DZD', 'EGP', 'ETB', 'EUR', 'FJD', 'GBP', 'GEL', 'GIP',
@@ -48,7 +50,20 @@ class gateway extends \core_payment\gateway {
             'KZT', 'LBP', 'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRO', 'MVR', 'MWK', 'MXN',
             'MYR', 'MZN', 'NAD', 'NGN', 'NOK', 'NPR', 'NZD', 'PGK', 'PHP', 'PKR', 'PLN', 'QAR', 'RON', 'RSD', 'RUB', 'RWF',
             'SAR', 'SBD', 'SCR', 'SEK', 'SGD', 'SLL', 'SOS', 'SZL', 'THB', 'TJS', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH',
-            'UGX', 'UZS', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'YER', 'ZAR', 'INR'
+            'UGX', 'UZS', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'YER', 'ZAR', 'INR',
+        ];
+    }
+
+    /**
+     * The list of zero/non-decimal currencies in Stripe.
+     *
+     * {@link https://stripe.com/docs/currencies#zero-decimal}
+     *
+     * @return string[]
+     */
+    public static function get_zero_decimal_currencies(): array {
+        return [
+            'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
         ];
     }
 

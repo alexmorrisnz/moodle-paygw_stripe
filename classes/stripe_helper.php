@@ -65,7 +65,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            '1.2',
+            '1.10',
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
@@ -226,20 +226,22 @@ class stripe_helper {
     public function generate_payment(object $config, string $currency, string $description, float $cost, string $component,
         string $paymentarea, string $itemid): string {
         global $CFG, $USER;
+
+        $unitamount = $this->get_unit_amount($cost, $currency);
         $currency = strtolower($currency);
 
         if (!$product = $this->get_product($component, $paymentarea, $itemid)) {
             $product = $this->create_product($description, $component, $paymentarea, $itemid);
         }
         if (!$price = $this->get_price($product)) {
-            $price = $this->create_price($currency, $product->id, $cost * 100, $config->enableautomatictax == 1,
+            $price = $this->create_price($currency, $product->id, $unitamount, $config->enableautomatictax == 1,
                 $config->defaulttaxbehavior);
         } else {
-            if ($price->unit_amount != $cost * 100 || $price->currency != $currency) {
+            if ($price->unit_amount != $unitamount || $price->currency != $currency) {
                 // We cannot update the price or currency, so we must create a new price.
                 $price->updateAttributes(['active' => false]);
                 $price->save();
-                $price = $this->create_price($currency, $product->id, $cost * 100, $config->enableautomatictax == 1,
+                $price = $this->create_price($currency, $product->id, $unitamount, $config->enableautomatictax == 1,
                     $config->defaulttaxbehavior);
             }
             // Set tax behavior if not set already.
@@ -292,6 +294,20 @@ class stripe_helper {
     public function is_paid(string $sessionid): bool {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         return $session->payment_status === 'paid';
+    }
+
+    /**
+     * Convert the cost into the unit amount accounting for zero-decimal currencies.
+     *
+     * @param float $cost
+     * @param string $currency
+     * @return float
+     */
+    public function get_unit_amount(float $cost, string $currency): float {
+        if (in_array($currency, gateway::get_zero_decimal_currencies())) {
+            return $cost;
+        }
+        return $cost * 100;
     }
 
 }
