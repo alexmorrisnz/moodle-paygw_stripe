@@ -40,6 +40,7 @@ $config = (object) helper::get_gateway_configuration($component, $paymentarea, $
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
+$stripehelper->update_payment_status($sessionid);
 if ($stripehelper->is_paid($sessionid)) {
     // Deliver course.
     $payable = helper::get_payable($component, $paymentarea, $itemid);

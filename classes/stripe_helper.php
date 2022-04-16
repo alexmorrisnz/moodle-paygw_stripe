@@ -255,7 +255,7 @@ class stripe_helper {
             $customer = $this->create_customer($USER);
         }
 
-        $checkoutsession = $this->stripe->checkout->sessions->create([
+        $session = $this->stripe->checkout->sessions->create([
             'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
@@ -281,7 +281,12 @@ class stripe_helper {
                 'address' => 'auto',
             ],
         ]);
-        return $checkoutsession->id;
+
+        // Save details to database, so we can track transaction data at a later date.
+        $this->save_payment_details($session->payment_intent, $customer->id, $session->amount_total, $session->payment_status,
+            $session->status, $product->id);
+
+        return $session->id;
     }
 
     /**
@@ -308,6 +313,55 @@ class stripe_helper {
             return $cost;
         }
         return $cost * 100;
+    }
+
+    /**
+     * Saves a payment intent details to database.
+     *
+     * @param string $paymentintent Payment intent ID
+     * @param string $customerid Stripe Customer ID
+     * @param int $amounttotal Total amount to be paid
+     * @param string $paymentstatus Payment status
+     * @param string $status Checkout session status
+     * @param string $productid Stripe product ID
+     * @return void
+     * @throws \dml_exception
+     */
+    public function save_payment_details(string $paymentintent, string $customerid, int $amounttotal, string $paymentstatus,
+        string $status, string $productid): void {
+        global $DB, $USER;
+
+        $intent = new \stdClass();
+        $intent->userid = $USER->id;
+        $intent->paymentintent = $paymentintent;
+        $intent->customerid = $customerid;
+        $intent->amounttotal = $amounttotal;
+        $intent->paymentstatus = $paymentstatus;
+        $intent->status = $status;
+        $intent->productid = $productid;
+
+        $DB->insert_record('paygw_stripe_intents', $intent);
+    }
+
+    /**
+     * Updates the stored payment intent status with the latest details from checkout session.
+     *
+     * @param string $sessionid
+     * @return void
+     * @throws ApiErrorException|\dml_exception
+     */
+    public function update_payment_status(string $sessionid) {
+        global $DB;
+
+        $session = $this->stripe->checkout->sessions->retrieve($sessionid);
+        $intent = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent]);
+        if ($intent == null) {
+            return;
+        }
+
+        $intent->paymentstatus = $session->payment_status;
+        $intent->status = $session->status;
+        $DB->update_record('paygw_stripe_intents', $intent);
     }
 
 }

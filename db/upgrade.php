@@ -76,5 +76,35 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2021082800, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2022041700) {
+
+        // Define table paygw_stripe_intents to be created.
+        $table = new xmldb_table('paygw_stripe_intents');
+
+        // Adding fields to table paygw_stripe_intents.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('paymentintent', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('customerid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('amounttotal', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('paymentstatus', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('status', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('productid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+
+        // Adding keys to table paygw_stripe_intents.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        // Adding index to table paygw_stripe_intents.
+        $table->add_index('paymentintent', XMLDB_INDEX_UNIQUE, ['payment_intent']);
+
+        // Conditionally launch create table for paygw_stripe_intents.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Stripe savepoint reached.
+        upgrade_plugin_savepoint(true, 2022041700, 'paygw', 'stripe');
+    }
+
     return true;
 }
