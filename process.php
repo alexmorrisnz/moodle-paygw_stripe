@@ -49,16 +49,7 @@ if ($stripehelper->is_paid($sessionid)) {
     helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $USER->id);
 
     // Find redirection.
-    $url = new moodle_url('/');
-    // Method only exists in 3.11+.
-    if (method_exists('\core_payment\helper', 'get_success_url')) {
-        $url = helper::get_success_url($component, $paymentarea, $itemid);
-    } else if ($component == 'enrol_fee' && $paymentarea == 'fee') {
-        $courseid = $DB->get_field('enrol', 'courseid', ['enrol' => 'fee', 'id' => $itemid]);
-        if (!empty($courseid)) {
-            $url = course_get_url($courseid);
-        }
-    }
+    $url = helper::get_success_url($component, $paymentarea, $itemid);
     redirect($url, get_string('paymentsuccessful', 'paygw_stripe'), 0, 'success');
 }
 redirect(new moodle_url('/'), get_string('paymentcancelled', 'paygw_stripe'));
