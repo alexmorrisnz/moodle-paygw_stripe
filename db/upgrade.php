@@ -93,7 +93,7 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
 
         // Adding index to table paygw_stripe_intents.
-        $table->add_index('paymentintent', XMLDB_INDEX_UNIQUE, ['payment_intent']);
+        $table->add_index('paymentintent', XMLDB_INDEX_UNIQUE, ['paymentintent']);
 
         // Conditionally launch create table for paygw_stripe_intents.
         if (!$dbman->table_exists($table)) {
