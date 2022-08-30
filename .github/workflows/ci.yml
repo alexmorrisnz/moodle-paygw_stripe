@@ -8,7 +8,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:10
+        image: postgres:12
         env:
           POSTGRES_USER: 'postgres'
           POSTGRES_HOST_AUTH_METHOD: 'trust'
@@ -96,10 +96,6 @@ jobs:
       - name: Mustache Lint
         if: ${{ always() }}
         run: moodle-plugin-ci mustache
-
-      - name: Grunt
-        if: ${{ always() }}
-        run: moodle-plugin-ci grunt --max-lint-warnings 0
 
       - name: PHPUnit tests
         if: ${{ always() }}
