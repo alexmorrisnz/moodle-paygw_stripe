@@ -24,6 +24,7 @@
 
 namespace paygw_stripe;
 
+use Stripe\Checkout\Session;
 use Stripe\Customer;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
@@ -65,7 +66,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            '1.10',
+            '1.13',
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
@@ -282,10 +283,6 @@ class stripe_helper {
             ],
         ]);
 
-        // Save details to database, so we can track transaction data at a later date.
-        $this->save_payment_details($session->payment_intent, $customer->id, $session->amount_total, $session->payment_status,
-            $session->status, $product->id);
-
         return $session->id;
     }
 
@@ -316,52 +313,32 @@ class stripe_helper {
     }
 
     /**
-     * Saves a payment intent details to database.
-     *
-     * @param string $paymentintent Payment intent ID
-     * @param string $customerid Stripe Customer ID
-     * @param int $amounttotal Total amount to be paid
-     * @param string $paymentstatus Payment status
-     * @param string $status Checkout session status
-     * @param string $productid Stripe product ID
-     * @return void
-     * @throws \dml_exception
-     */
-    public function save_payment_details(string $paymentintent, string $customerid, int $amounttotal, string $paymentstatus,
-        string $status, string $productid): void {
-        global $DB, $USER;
-
-        $intent = new \stdClass();
-        $intent->userid = $USER->id;
-        $intent->paymentintent = $paymentintent;
-        $intent->customerid = $customerid;
-        $intent->amounttotal = $amounttotal;
-        $intent->paymentstatus = $paymentstatus;
-        $intent->status = $status;
-        $intent->productid = $productid;
-
-        $DB->insert_record('paygw_stripe_intents', $intent);
-    }
-
-    /**
-     * Updates the stored payment intent status with the latest details from checkout session.
+     * Saves the payment intent status with customer and product id details.
      *
      * @param string $sessionid
      * @return void
      * @throws ApiErrorException|\dml_exception
      */
-    public function update_payment_status(string $sessionid) {
-        global $DB;
+    public function save_payment_status(string $sessionid) {
+        global $DB, $USER;
 
-        $session = $this->stripe->checkout->sessions->retrieve($sessionid);
+        $session = $this->stripe->checkout->sessions->retrieve($sessionid, ['expand' => ['line_items', 'customer']]);
+
         $intent = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent]);
-        if ($intent == null) {
+        if ($intent != null) {
             return;
         }
 
+        $intent = new \stdClass();
+        $intent->userid = $USER->id;
+        $intent->paymentintent = $session->payment_intent;
+        $intent->customerid = $session->customer->id;
+        $intent->amounttotal = $session->amount_total;
         $intent->paymentstatus = $session->payment_status;
         $intent->status = $session->status;
-        $DB->update_record('paygw_stripe_intents', $intent);
+        $intent->productid = $session->line_items->first()->price->product;
+
+        $DB->insert_record('paygw_stripe_intents', $intent);
     }
 
 }
