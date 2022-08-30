@@ -3,7 +3,7 @@
     <library>
         <location>.extlib/stripe-php</location>
         <name>Stripe PHP bindings</name>
-        <version>7.78.0</version>
+        <version>9.4.0</version>
         <license>MIT License</license>
         <licenseversion>1</licenseversion>
     </library>
