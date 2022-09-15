@@ -262,6 +262,11 @@ class stripe_helper {
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
             'payment_method_types' => $config->paymentmethods,
+            'payment_method_options' => [
+                'wechat_pay' => [
+                    'client' => "web"
+                ],
+            ],
             'mode' => 'payment',
             'line_items' => [[
                 'price' => $price,

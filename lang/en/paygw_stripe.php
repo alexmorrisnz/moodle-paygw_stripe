@@ -56,6 +56,7 @@ $string['paymentmethod:sepa_debit'] = 'SEPA Direct Debit';
 $string['paymentmethod:sofort'] = 'Sofort';
 $string['paymentmethod:upi'] = 'UPI';
 $string['paymentmethod:netbanking'] = 'NetBanking';
+$string['paymentmethod:wechat_pay'] = 'WeChat Pay';
 
 $string['privacy:metadata:stripe_customers'] = 'Stores the relation from Moodle users to Stripe customer objects';
 $string['privacy:metadata:stripe_customers:userid'] = 'Moodle user ID';
