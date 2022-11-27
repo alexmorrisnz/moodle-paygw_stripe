@@ -1,6 +1,6 @@
 name: Moodle Plugin CI
 
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 jobs:
   test:
@@ -30,9 +30,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['7.3', '7.4', '8.0']
-        moodle-branch: ['MOODLE_311_STABLE', 'MOODLE_400_STABLE']
-        database: [pgsql, mariadb]
+        php: [ '7.4', '8.0' ]
+        moodle-branch: [ 'MOODLE_311_STABLE', 'MOODLE_400_STABLE', 'MOODLE_401_STABLE', 'master' ]
+        database: [ pgsql, mariadb ]
 
     steps:
       - name: Check out repository code
@@ -96,6 +96,10 @@ jobs:
       - name: Mustache Lint
         if: ${{ always() }}
         run: moodle-plugin-ci mustache
+
+      - name: Grunt
+        if: ${{ !contains(fromJSON('["MOODLE_311_STABLE", "MOODLE_400_STABLE", "MOODLE_401_STABLE"]'), matrix.moodle-branch)  }}
+        run: moodle-plugin-ci grunt --max-lint-warnings 0
 
       - name: PHPUnit tests
         if: ${{ always() }}
