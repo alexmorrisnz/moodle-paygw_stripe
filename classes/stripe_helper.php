@@ -66,7 +66,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            '1.14',
+            '1.15',
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
