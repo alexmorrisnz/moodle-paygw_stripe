@@ -24,13 +24,17 @@
 
 namespace paygw_stripe;
 
-use Stripe\Checkout\Session;
+use core_payment\helper;
+use core_payment\local\entities\payable;
+use core_user;
 use Stripe\Customer;
+use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
 use Stripe\Product;
 use Stripe\Stripe;
 use Stripe\StripeClient;
+use Stripe\WebhookEndpoint;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -66,7 +70,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            '1.15',
+            '1.16',
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
@@ -215,7 +219,7 @@ class stripe_helper {
      * Create a payment intent and return with the checkout session id.
      *
      * @param object $config
-     * @param string $currency
+     * @param payable $payable
      * @param string $description
      * @param float $cost
      * @param string $component
@@ -224,12 +228,15 @@ class stripe_helper {
      * @return string
      * @throws ApiErrorException
      */
-    public function generate_payment(object $config, string $currency, string $description, float $cost, string $component,
+    public function generate_payment(object $config, payable $payable, string $description, float $cost, string $component,
         string $paymentarea, string $itemid): string {
         global $CFG, $USER;
 
-        $unitamount = $this->get_unit_amount($cost, $currency);
-        $currency = strtolower($currency);
+        // Ensure webhook exists before we potentially use it.
+        $this->create_webhook($payable->get_account_id());
+
+        $unitamount = $this->get_unit_amount($cost, $payable->get_currency());
+        $currency = strtolower($payable->get_currency());
 
         if (!$product = $this->get_product($component, $paymentarea, $itemid)) {
             $product = $this->create_product($description, $component, $paymentarea, $itemid);
@@ -281,6 +288,20 @@ class stripe_helper {
                 'username' => $USER->username,
                 'firstname' => $USER->firstname,
                 'lastname' => $USER->lastname,
+                'component' => $component,
+                'paymentarea' => $paymentarea,
+                'itemid' => $itemid,
+            ],
+            'payment_intent_data' => [
+                'metadata' => [
+                    'userid' => $USER->id,
+                    'username' => $USER->username,
+                    'firstname' => $USER->firstname,
+                    'lastname' => $USER->lastname,
+                    'component' => $component,
+                    'paymentarea' => $paymentarea,
+                    'itemid' => $itemid,
+                ],
             ],
             'allow_promotion_codes' => $config->allowpromotioncodes == 1,
             'customer_update' => [
@@ -301,6 +322,19 @@ class stripe_helper {
     public function is_paid(string $sessionid): bool {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         return $session->payment_status === 'paid';
+    }
+
+    /**
+     * Check if a checkout session is pending payment.
+     *
+     * @param string $sessionid Stripe session ID
+     * @return bool
+     * @throws ApiErrorException
+     */
+    public function is_pending(string $sessionid): bool {
+        // Check payment intent here as the session status is a simple pass/fail that doesn't include processing.
+        $session = $this->stripe->checkout->sessions->retrieve($sessionid, ['expand' => ['payment_intent']]);
+        return $session->payment_intent->status === 'processing';
     }
 
     /**
@@ -331,6 +365,9 @@ class stripe_helper {
 
         $intent = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent]);
         if ($intent != null) {
+            $intent->status = $session->status;
+            $intent->paymentstatus = $session->payment_status;
+            $DB->update_record('paygw_stripe_intents', $intent);
             return;
         }
 
@@ -344,6 +381,144 @@ class stripe_helper {
         $intent->productid = $session->line_items->first()->price->product;
 
         $DB->insert_record('paygw_stripe_intents', $intent);
+    }
+
+    /**
+     * Find and return webhook endpoint if it exists.
+     *
+     * @param int $paymentaccountid
+     * @return WebhookEndpoint|null
+     * @throws ApiErrorException|\dml_exception
+     */
+    public function get_webhook(int $paymentaccountid): ?WebhookEndpoint {
+        global $DB;
+
+        if (!($record = $DB->get_record('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]))) {
+            return null;
+        }
+
+        if ($webhook = $this->stripe->webhookEndpoints->retrieve($record->webhookid)) {
+            // Webhook still exists, lets set the secret and return.
+            $webhook->secret = $record->secret;
+            return $webhook;
+        }
+
+        return null;
+    }
+
+    /**
+     * Create webhook for given account id if none already exists.
+     *
+     * @param int $paymentaccountid
+     * @return bool True if webhook was created
+     * @throws ApiErrorException
+     * @throws \dml_exception
+     */
+    public function create_webhook(int $paymentaccountid): bool {
+        global $CFG, $DB;
+
+        if ($this->get_webhook($paymentaccountid) != null) {
+            return false;
+        }
+
+        $webhook = $this->stripe->webhookEndpoints->create([
+            'url' => $CFG->wwwroot . '/payment/gateway/stripe/webhook.php',
+            'enabled_events' => [
+                'checkout.session.completed',
+                'checkout.session.async_payment_succeeded',
+                'checkout.session.async_payment_failed',
+            ],
+        ]);
+
+        $datum = new \stdClass();
+        $datum->paymentaccountid = $paymentaccountid;
+        $datum->webhookid = $webhook->id;
+        $datum->secret = $webhook->secret;
+        $DB->insert_record('paygw_stripe_webhooks', $datum);
+
+        return true;
+    }
+
+    /**
+     * Process an async payment event.
+     * Deliver the course if payment was successful or notify the user the payment failed.
+     *
+     * @param Event $event
+     * @param array $metadata Array containing component, paymentarea, and itemid values set during session creation.
+     * @return bool True if stripe data was valid, false otherwise.
+     * @throws ApiErrorException|\dml_exception
+     */
+    public function process_async_payment(Event $event, array $metadata): bool {
+        global $DB;
+
+        if (!isset($event->data->object)) {
+            return false;
+        }
+
+        // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event
+        $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
+        if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
+            return false;
+        }
+        $this->save_payment_status($session->id); // Update saved intent status.
+
+        switch ($event->type) {
+            case 'checkout.session.async_payment_succeeded':
+                if (!$this->is_paid($session->id)) {
+                    // Payment not complete, notify user payment failed.
+                    $this->notify_user($intentrecord->userid, 'failed');
+                    break;
+                }
+
+                // Deliver course.
+                $payable = helper::get_payable($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
+                $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(),
+                    helper::get_gateway_surcharge('stripe'));
+                $paymentid = helper::save_payment($payable->get_account_id(), $metadata['component'], $metadata['paymentarea'],
+                    $metadata['itemid'], $intentrecord->userid, $cost, $payable->get_currency(), 'stripe');
+                helper::deliver_order($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], $paymentid,
+                    $intentrecord->userid);
+
+                // Notify user payment was successful.
+                $url = helper::get_success_url($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
+                $this->notify_user($intentrecord->userid, 'successful', ['url' => $url->out()]);
+                break;
+            case 'checkout.session.async_payment_failed':
+                // Notify user payment failed.
+                $this->notify_user($intentrecord->userid, 'failed');
+                break;
+            default:
+                return false;
+        }
+        return true;
+    }
+
+    /**
+     * Send message to user regarding payment status.
+     *
+     * @param $userto
+     * @param $status
+     * @param array $data
+     * @return void
+     * @throws \coding_exception
+     */
+    private function notify_user($userto, $status, array $data = []) {
+        $eventdata = new \core\message\message();
+        $eventdata->courseid = SITEID;
+        $eventdata->component = 'paygw_stripe';
+        $eventdata->name = 'payment_' . $status;
+        $eventdata->notification = 1;
+        $eventdata->userfrom = core_user::get_noreply_user();
+        $eventdata->userto = $userto;
+        $eventdata->subject = get_string('payment:' . $status . ':subject', 'paygw_stripe', $data);
+        $eventdata->fullmessage = get_string('payment:' . $status . ':message', 'paygw_stripe', $data);
+        $eventdata->fullmessageformat = FORMAT_PLAIN;
+        $eventdata->fullmessagehtml = '';
+        $eventdata->smallmessage = '';
+        if (isset($data['url'])) {
+            $eventdata->contexturl = $data['url'];
+        }
+        message_send($eventdata);
     }
 
 }

@@ -36,11 +36,17 @@ $string['stripeaccount'] = 'Stripe account ID';
 $string['stripeaccount_help'] = 'For creating the direct charge branding page';
 $string['paymentsuccessful'] = 'Payment was successful';
 $string['paymentcancelled'] = 'Payment was cancelled';
+$string['paymentpending'] = 'Payment is pending, you will be enrolled when the payment has cleared.';
 $string['customerdescription'] = 'Moodle User ID: {$a}';
 $string['enableautomatictax'] = 'Enable automatic tax';
 $string['enableautomatictax_desc'] = 'Automatic tax must be enabled and configured in the Stripe dashboard.';
 $string['defaulttaxbehavior'] = 'Default tax behavior';
 $string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclusive). Changeable in Stripe dashboard.';
+
+$string['payment:successful:subject'] = 'Payment successful';
+$string['payment:successful:message'] = 'Your payment was successful, you can now visit {$a->url}';
+$string['payment:failed:subject'] = 'Payment failed';
+$string['payment:failed:message'] = 'Your payment failed to clear, please check your payment details and try again.';
 
 $string['taxbehavior:exclusive'] = 'Exclusive';
 $string['taxbehavior:inclusive'] = 'Inclusive';

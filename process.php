@@ -52,5 +52,7 @@ if ($stripehelper->is_paid($sessionid)) {
     // Find redirection.
     $url = helper::get_success_url($component, $paymentarea, $itemid);
     redirect($url, get_string('paymentsuccessful', 'paygw_stripe'), 0, 'success');
+} else if ($stripehelper->is_pending($sessionid)) {
+    redirect(new moodle_url('/'), get_string('paymentpending', 'paygw_stripe'));
 }
 redirect(new moodle_url('/'), get_string('paymentcancelled', 'paygw_stripe'));

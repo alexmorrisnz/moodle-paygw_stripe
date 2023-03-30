@@ -15,16 +15,26 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information
+ * Defines message providers (types of messages being sent)
  *
  * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  2023 Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2023033000;        // The current plugin version (Date: YYYYMMDDXX).
-$plugin->release   = '1.16';
-$plugin->requires  = 2021051700;        // Requires this Moodle version. 3.11.
-$plugin->component = 'paygw_stripe';    // Full name of the plugin (used for diagnostics).
+$messageproviders = [
+    'payment_successful' => [
+        'defaults' => [
+            'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+            'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+        ],
+    ],
+    'payment_failed' => [
+        'defaults' => [
+            'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+            'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+        ],
+    ],
+];

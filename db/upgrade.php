@@ -34,7 +34,6 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2021082800) {
-
         // Define table paygw_stripe_products to be created.
         $table = new xmldb_table('paygw_stripe_products');
 
@@ -75,7 +74,6 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
     }
 
     if ($oldversion < 2022041700) {
-
         // Define table paygw_stripe_intents to be created.
         $table = new xmldb_table('paygw_stripe_intents');
 
@@ -102,6 +100,31 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
 
         // Stripe savepoint reached.
         upgrade_plugin_savepoint(true, 2022041700, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2023033000) {
+        // Define table paygw_stripe_webhooks to be created.
+        $table = new xmldb_table('paygw_stripe_webhooks');
+
+        // Adding fields to table paygw_stripe_webhooks.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('paymentaccountid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('webhookid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('secret', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+
+        // Adding keys to table paygw_stripe_webhooks.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        // Adding index to table paygw_stripe_webhooks.
+        $table->add_index('paymentaccountid', XMLDB_INDEX_UNIQUE, ['paymentaccountid']);
+
+        // Conditionally launch create table for paygw_stripe_webhooks.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Stripe savepoint reached.
+        upgrade_plugin_savepoint(true, 2023033000, 'paygw', 'stripe');
     }
 
     return true;
