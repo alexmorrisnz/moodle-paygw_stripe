@@ -455,7 +455,7 @@ class stripe_helper {
             return false;
         }
 
-        // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event
+        // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
         $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
         if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
             return false;
@@ -496,13 +496,13 @@ class stripe_helper {
     /**
      * Send message to user regarding payment status.
      *
-     * @param $userto
-     * @param $status
-     * @param array $data
+     * @param int $userto User ID to send notification to
+     * @param string $status Payment status
+     * @param array $data Data passed to get_string
      * @return void
      * @throws \coding_exception
      */
-    private function notify_user($userto, $status, array $data = []) {
+    private function notify_user(int $userto, string $status, array $data = []) {
         $eventdata = new \core\message\message();
         $eventdata->courseid = SITEID;
         $eventdata->component = 'paygw_stripe';

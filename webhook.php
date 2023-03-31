@@ -24,9 +24,9 @@
 
 define('NO_MOODLE_COOKIES', true);
 
-use core_payment\account;
 use core_payment\helper;
 use paygw_stripe\stripe_helper;
+use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 
 require_once(__DIR__ . '/../../../config.php');
@@ -37,11 +37,12 @@ $payload = @file_get_contents('php://input');
 // Fetch gateway configuration using metadata values we set in the payment intent data.
 $jsonpayload = json_decode($payload, true);
 $metadata = $jsonpayload['data']['object']['metadata'];
-$config = (object) helper::get_gateway_configuration($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], 'stripe');
+$config =
+    (object) helper::get_gateway_configuration($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], 'stripe');
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
 // Validate payload using secret retrieved from webhook table.
-$sig_header = $_SERVER['HTTP_STRIPE_SIGNATURE'];
+$sigheader = $_SERVER['HTTP_STRIPE_SIGNATURE'];
 $event = null;
 
 $payable = helper::get_payable($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
@@ -50,23 +51,23 @@ if ($webhook == null) {
     http_response_code(500);
     exit();
 }
-$endpoint_secret = $webhook->secret;
+$endpointsecret = $webhook->secret;
 
 try {
     $event = Webhook::constructEvent(
-        $payload, $sig_header, $endpoint_secret
+        $payload, $sigheader, $endpointsecret
     );
 
-    if(!$stripehelper->process_async_payment($event, $metadata)) {
+    if (!$stripehelper->process_async_payment($event, $metadata)) {
         // Payload accepted but nothing to act upon.
         http_response_code(202);
         exit();
     }
-} catch(\UnexpectedValueException $e) {
+} catch (UnexpectedValueException $e) {
     // Invalid payload.
     http_response_code(400);
     exit();
-} catch(\Stripe\Exception\SignatureVerificationException $e) {
+} catch (SignatureVerificationException $e) {
     // Invalid signature.
     http_response_code(400);
     exit();
