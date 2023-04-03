@@ -48,6 +48,9 @@ $string['payment:successful:message'] = 'Your payment was successful, you can no
 $string['payment:failed:subject'] = 'Payment failed';
 $string['payment:failed:message'] = 'Your payment failed to clear, please check your payment details and try again.';
 
+$string['messageprovider:payment_successful'] = 'Successful delayed payment confirmation notification';
+$string['messageprovider:payment_failed'] = 'Failed delayed payment notification';
+
 $string['taxbehavior:exclusive'] = 'Exclusive';
 $string['taxbehavior:inclusive'] = 'Inclusive';
 
