@@ -29,7 +29,7 @@
  * @return bool result
  */
 function xmldb_paygw_stripe_upgrade($oldversion) {
-    global $DB;
+    global $DB, $CFG;
 
     $dbman = $DB->get_manager();
 
@@ -125,6 +125,30 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
 
         // Stripe savepoint reached.
         upgrade_plugin_savepoint(true, 2023033000, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2023040400) {
+        if ($CFG->branch == '311') {
+            $names = [
+                'message_provider_paygw_stripe_payment_successful_loggedin',
+                'message_provider_paygw_stripe_payment_successful_loggedoff',
+                'message_provider_paygw_stripe_payment_failed_loggedin',
+                'message_provider_paygw_stripe_payment_failed_loggedoff'
+            ];
+
+            foreach ($names as $name) {
+                $record = [
+                    'plugin' => 'message',
+                    'name' => $name,
+                    'value' => 'email,popup'
+                ];
+                if (!$DB->get_record('config_plugins', $record)) {
+                    $DB->insert_record('config_plugins', $record);
+                }
+            }
+        }
+
+        upgrade_plugin_savepoint(true, 2023040400, 'paygw', 'stripe');
     }
 
     return true;
