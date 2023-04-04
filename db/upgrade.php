@@ -142,7 +142,11 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
                     'name' => $name,
                     'value' => 'email,popup'
                 ];
-                if (!$DB->get_record('config_plugins', $record)) {
+                if (!$DB->record_exists_select('config_plugins',
+                    'plugin = :plugin AND name = :name AND ' . $DB->sql_compare_text('value') . ' = ' .
+                    $DB->sql_compare_text(':value'),
+                    $record
+                )) {
                     $DB->insert_record('config_plugins', $record);
                 }
             }
