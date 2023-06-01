@@ -75,7 +75,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            '1.17',
+            get_config('paygw_stripe')->version,
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
@@ -661,6 +661,7 @@ class stripe_helper {
                 'checkout.session.completed',
                 'checkout.session.async_payment_succeeded',
                 'checkout.session.async_payment_failed',
+                'customer.subscription.deleted'
             ],
         ]);
 
@@ -689,15 +690,14 @@ class stripe_helper {
             return false;
         }
 
-        // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
-        $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
-        if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
-            return false;
-        }
-        $this->save_payment_status($session->id); // Update saved intent status.
-
         switch ($event->type) {
             case 'checkout.session.async_payment_succeeded':
+                // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
+                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
+                if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
+                    return false;
+                }
+                $this->save_payment_status($session->id); // Update saved intent status.
                 if (!$this->is_paid($session->id)) {
                     // Payment not complete, notify user payment failed.
                     $this->notify_user($intentrecord->userid, 'failed');
@@ -718,8 +718,20 @@ class stripe_helper {
                 $this->notify_user($intentrecord->userid, 'successful', ['url' => $url->out()]);
                 break;
             case 'checkout.session.async_payment_failed':
+                // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
+                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
+                if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
+                    return false;
+                }
+                $this->save_payment_status($session->id); // Update saved intent status.
                 // Notify user payment failed.
                 $this->notify_user($intentrecord->userid, 'failed');
+                break;
+            case 'customer.subscription.deleted':
+                if(!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
+                    return false;
+                }
+                $this->cancel_subscription($moodlesub, false);
                 break;
             default:
                 return false;
@@ -794,10 +806,14 @@ class stripe_helper {
      * @throws \coding_exception
      * @throws \dml_exception
      */
-    public function cancel_subscription(\stdClass $moodlesub) {
+    public function cancel_subscription(\stdClass $moodlesub, bool $cancelstripe = true) {
         global $DB;
 
-        $subscription = $this->stripe->subscriptions->cancel($moodlesub->subscriptionid);
+        if ($cancelstripe) {
+            $subscription = $this->stripe->subscriptions->cancel($moodlesub->subscriptionid);
+        } else {
+            $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
+        }
         $datum = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $moodlesub->subscriptionid]);
         $datum->status = $subscription->status;
         $DB->update_record('paygw_stripe_subscriptions', $datum);

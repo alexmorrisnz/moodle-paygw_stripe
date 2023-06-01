@@ -36,6 +36,10 @@ $payload = @file_get_contents('php://input');
 
 // Fetch gateway configuration using metadata values we set in the payment intent data.
 $jsonpayload = json_decode($payload, true);
+if ($jsonpayload == null) {
+    http_response_code(400);
+    exit();
+}
 $metadata = $jsonpayload['data']['object']['metadata'];
 $config =
     (object) helper::get_gateway_configuration($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], 'stripe');
