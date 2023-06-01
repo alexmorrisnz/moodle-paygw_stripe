@@ -42,6 +42,45 @@ $string['enableautomatictax'] = 'Enable automatic tax';
 $string['enableautomatictax_desc'] = 'Automatic tax must be enabled and configured in the Stripe dashboard.';
 $string['defaulttaxbehavior'] = 'Default tax behavior';
 $string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclusive). Changeable in Stripe dashboard.';
+$string['profilecat'] = 'Stripe Payment Subscriptions';
+$string['cancelsubscriptions'] = 'Change Subscriptions';
+$string['subscriptions'] = 'Subscriptions';
+$string['subscriptionsuccessful'] = 'Successfully subscribed';
+$string['paymenttype'] = 'Payment Type';
+$string['paymenttype:onetime'] = 'One Time';
+$string['paymenttype:subscription'] = 'Subscription';
+$string['subscriptioninterval'] = 'Subscription Period';
+$string['customsubscriptioninterval'] = 'Custom Subscription Period';
+$string['customsubscriptionintervalcount'] = 'Custom Subscription Period Interval';
+$string['customsubscriptionintervalcount_help'] = '';
+$string['anchoredbilling'] = 'Anchored Billing';
+$string['anchoredbilling_help'] = 'Anchor billing date to the start of the subscription period';
+$string['trialperiod'] = 'Trial Period';
+$string['trialperiod_help'] = 'E.g. You register on the 25th of April, April is free and billing starts on the 1st May';
+$string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
+$string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
+
+$string['customsubscriptioninterval:day'] = 'Day';
+$string['customsubscriptioninterval:week'] = 'Week';
+$string['customsubscriptioninterval:month'] = 'Month';
+$string['customsubscriptioninterval:year'] = 'Year';
+
+$string['subscriptionperiod:daily'] = 'Daily';
+$string['subscriptionperiod:weekly'] = 'Weekly';
+$string['subscriptionperiod:monthly'] = 'Monthly';
+$string['subscriptionperiod:every3months'] = 'Every 3 Months';
+$string['subscriptionperiod:every6months'] = 'Every 6 Months';
+$string['subscriptionperiod:yearly'] = 'Yearly';
+$string['subscriptionperiod:custom'] = 'Custom';
+
+$string['subscriptionstatus:active'] = 'Active';
+$string['subscriptionstatus:past_due'] = 'Payment Past Due';
+$string['subscriptionstatus:unpaid'] = 'Unpaid';
+$string['subscriptionstatus:canceled'] = 'Cancelled';
+$string['subscriptionstatus:incomplete'] = 'Incomplete';
+$string['subscriptionstatus:incomplete_expired'] = 'Expired';
+$string['subscriptionstatus:trialing'] = 'Trialing';
+$string['subscriptionstatus:paused'] = 'Paused';
 
 $string['payment:successful:subject'] = 'Payment successful';
 $string['payment:successful:message'] = 'Your payment was successful, you can now visit {$a->url}';
