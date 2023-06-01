@@ -167,7 +167,7 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         // Define table paygw_stripe_subscriptions to be created.
         $table = new xmldb_table('paygw_stripe_subscriptions');
 
-        // Adding fields to table paygw_stripe_webhooks.
+        // Adding fields to table paygw_stripe_subscriptions.
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
         $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
         $table->add_field('subscriptionid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
@@ -175,10 +175,6 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         $table->add_field('status', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
         $table->add_field('productid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
         $table->add_field('priceid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('component', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('component', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('paymentarea', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
 
         // Adding keys to table paygw_stripe_subscriptions.
         $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
