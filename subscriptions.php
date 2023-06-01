@@ -29,17 +29,17 @@ use paygw_stripe\stripe_helper;
 require('../../../config.php');
 require_once(__DIR__ . '/.extlib/stripe-php/init.php');
 
+require_login();
+
 $action = optional_param('action', false, PARAM_TEXT);
 $subid = optional_param('subscriptionid', null, PARAM_INT);
-
-require_login();
 
 $PAGE->set_url('/payment/gateway/stripe/subscriptions.php');
 $PAGE->set_context(context_system::instance());
 $PAGE->set_title(get_string('subscriptions', 'paygw_stripe'));
 $PAGE->set_heading(get_string('subscriptions', 'paygw_stripe'));
 
-if (is_int($subid)) {
+if ($subid != null) {
     $subscription = $DB->get_record('paygw_stripe_subscriptions', ['id' => $subid], '*', MUST_EXIST);
     $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');

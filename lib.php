@@ -34,16 +34,12 @@
  * @return void Return if the mobile web services setting is disabled or if not the current user.
  */
 function paygw_stripe_myprofile_navigation(\core_user\output\myprofile\tree $tree, $user, $iscurrentuser) {
-    $newnodes = [];
-
-    $newnodes[] = new core_user\output\myprofile\node('paygw_stripe', 'cancelsubscriptions',
-        get_string('cancelsubscriptions', 'paygw_stripe'), null, new moodle_url('/payment/gateway/stripe/subscriptions.php'));
-
-    $stripecat =
-        new core_user\output\myprofile\category('paygw_stripe', get_string('profilecat', 'paygw_stripe'), 'loginactivity');
-    $tree->add_category($stripecat);
-
-    foreach ($newnodes as $node) {
-        $tree->add_node($node);
+    if (!$iscurrentuser) {
+        return;
     }
+
+    $tree->add_category(new core_user\output\myprofile\category('paygw_stripe', get_string('profilecat', 'paygw_stripe'),
+        'loginactivity'));
+    $tree->add_node(new core_user\output\myprofile\node('paygw_stripe', 'cancelsubscriptions',
+        get_string('cancelsubscriptions', 'paygw_stripe'), null, new moodle_url('/payment/gateway/stripe/subscriptions.php')));
 }
