@@ -799,8 +799,8 @@ class stripe_helper {
             $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' . $price->recurring->interval,
             userdate($subscription->current_period_end),
             get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
-            '<a href="' . $portallink->out() . '">Update Payment Method</a>',
-            '<a href="' . $cancellink->out() . '">Cancel</a>',
+            $moodlesub->status != 'canceled' ? '<a href="' . $portallink->out() . '">Update Payment Method</a>' : '',
+            $moodlesub->status != 'canceled' ? '<a href="' . $cancellink->out() . '">Cancel</a>' : '',
         ];
     }
 
