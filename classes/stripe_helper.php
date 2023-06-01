@@ -439,7 +439,13 @@ class stripe_helper {
             'payment_settings' => [
                 'payment_method_types' => $config->paymentmethods,
             ],
-            'collection_method' => 'charge_automatically'
+            'collection_method' => 'charge_automatically',
+            'metadata' => [
+                'userid' => $USER->id,
+                'component' => $component,
+                'paymentarea' => $paymentarea,
+                'itemid' => $itemid,
+            ],
         ];
 
         if ($config->anchorbilling) {
@@ -675,15 +681,14 @@ class stripe_helper {
     }
 
     /**
-     * Process an async payment event.
-     * Deliver the course if payment was successful or notify the user the payment failed.
+     * Process stripe payment events
      *
      * @param Event $event
-     * @param array $metadata Array containing component, paymentarea, and itemid values set during session creation.
+     * @param array $metadata Array containing component, paymentarea, and itemid values set.
      * @return bool True if stripe data was valid, false otherwise.
      * @throws ApiErrorException|\dml_exception
      */
-    public function process_async_payment(Event $event, array $metadata): bool {
+    public function process_stripe_event(Event $event, array $metadata): bool {
         global $DB;
 
         if (!isset($event->data->object)) {
@@ -691,6 +696,8 @@ class stripe_helper {
         }
 
         switch ($event->type) {
+            // Process an async payment event.
+            // Deliver the course if payment was successful or notify the user the payment failed.
             case 'checkout.session.async_payment_succeeded':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
                 $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
@@ -727,6 +734,7 @@ class stripe_helper {
                 // Notify user payment failed.
                 $this->notify_user($intentrecord->userid, 'failed');
                 break;
+            // Handle customer subscriptions being deleted.
             case 'customer.subscription.deleted':
                 if (!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
                     return false;

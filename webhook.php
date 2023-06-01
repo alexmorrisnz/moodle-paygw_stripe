@@ -62,7 +62,7 @@ try {
         $payload, $sigheader, $endpointsecret
     );
 
-    if (!$stripehelper->process_async_payment($event, $metadata)) {
+    if (!$stripehelper->process_stripe_event($event, $metadata)) {
         // Payload accepted but nothing to act upon.
         http_response_code(202);
         exit();
