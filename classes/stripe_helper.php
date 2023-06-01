@@ -728,7 +728,7 @@ class stripe_helper {
                 $this->notify_user($intentrecord->userid, 'failed');
                 break;
             case 'customer.subscription.deleted':
-                if(!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
+                if (!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
                     return false;
                 }
                 $this->cancel_subscription($moodlesub, false);
@@ -801,6 +801,7 @@ class stripe_helper {
      * Unenrol the user from a course if that was the product chosen.
      *
      * @param \stdClass $moodlesub Moodle subscription record
+     * @param bool $cancelstripe Attempt to cancel subscription within Stripe
      * @return void
      * @throws ApiErrorException
      * @throws \coding_exception

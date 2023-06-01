@@ -22,6 +22,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
 require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 
 use core_payment\account;
@@ -216,6 +218,8 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
                         ]]);
                     }
                 } catch (Exception $ignored) {
+                    // Ignore errors, the api keys we are given may be wrong.
+                    continue;
                 }
             }
         }
