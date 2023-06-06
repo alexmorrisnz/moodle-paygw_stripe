@@ -34,6 +34,7 @@ $component = required_param('component', PARAM_ALPHANUMEXT);
 $paymentarea = required_param('paymentarea', PARAM_ALPHANUMEXT);
 $itemid = required_param('itemid', PARAM_INT);
 $description = required_param('description', PARAM_TEXT);
+$sessionid = optional_param('session_id', null, PARAM_TEXT);
 
 $config = (object) helper::get_gateway_configuration($component, $paymentarea, $itemid, 'stripe');
 $payable = helper::get_payable($component, $paymentarea, $itemid);
@@ -42,8 +43,16 @@ $surcharge = helper::get_gateway_surcharge('stripe');
 $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), $surcharge);
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
-$sessionid = $stripehelper->generate_payment($config, $payable, $description, $cost, $component,
-    $paymentarea, $itemid);
+if (!isset($config->type) || $config->type == 'onetime') {
+    $sessionid = $stripehelper->generate_payment($config, $payable, $description, $cost, $component,
+        $paymentarea, $itemid);
+} else {
+    $sessionid = $stripehelper->generate_subscription($config, $payable, $description, $cost, $component,
+        $paymentarea, $itemid, $sessionid);
+    if ($sessionid == null) {
+        redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));
+    }
+}
 
 ?>
 <!DOCTYPE html>

@@ -115,6 +115,50 @@ class gateway extends \core_payment\gateway {
             'inclusive' => get_string('taxbehavior:inclusive', 'paygw_stripe'),
         ]);
         $mform->addHelpButton('defaulttaxbehavior', 'defaulttaxbehavior', 'paygw_stripe');
+
+        $mform->addElement('select', 'type', get_string('paymenttype', 'paygw_stripe'), [
+            'onetime' => get_string('paymenttype:onetime', 'paygw_stripe'),
+            'subscription' => get_string('paymenttype:subscription', 'paygw_stripe'),
+        ]);
+        $mform->setType('type', PARAM_TEXT);
+        $mform->setDefault('type', 'onetime');
+
+        $mform->addElement('select', 'subscriptioninterval', get_string('subscriptioninterval', 'paygw_stripe'), [
+            'daily' => get_string('subscriptionperiod:daily', 'paygw_stripe'),
+            'weekly' => get_string('subscriptionperiod:weekly', 'paygw_stripe'),
+            'monthly' => get_string('subscriptionperiod:monthly', 'paygw_stripe'),
+            'every3months' => get_string('subscriptionperiod:every3months', 'paygw_stripe'),
+            'every6months' => get_string('subscriptionperiod:every6months', 'paygw_stripe'),
+            'yearly' => get_string('subscriptionperiod:yearly', 'paygw_stripe'),
+            'custom' => get_string('subscriptionperiod:custom', 'paygw_stripe'),
+        ]);
+        $mform->setType('subscriptioninterval', PARAM_TEXT);
+        $mform->setDefault('subscriptioninterval', 'monthly');
+
+        $mform->addElement('select', 'customsubscriptioninterval', get_string('customsubscriptioninterval', 'paygw_stripe'), [
+            'day' => get_string('customsubscriptioninterval:day', 'paygw_stripe'),
+            'week' => get_string('customsubscriptioninterval:week', 'paygw_stripe'),
+            'month' => get_string('customsubscriptioninterval:month', 'paygw_stripe'),
+            'year' => get_string('customsubscriptioninterval:year', 'paygw_stripe'),
+        ]);
+        $mform->setType('customsubscriptioninterval', PARAM_TEXT);
+        $mform->setDefault('customsubscriptioninterval', 'month');
+
+        $mform->addElement('text', 'customsubscriptionintervalcount',
+            get_string('customsubscriptionintervalcount', 'paygw_stripe'));
+        $mform->setType('customsubscriptionintervalcount', PARAM_INT);
+        $mform->setDefault('customsubscriptionintervalcount', 1);
+        $mform->addHelpButton('customsubscriptionintervalcount', 'customsubscriptionintervalcount', 'paygw_stripe');
+        $mform->addRule('customsubscriptionintervalcount', null, 'numeric', null, 'client');
+
+        $mform->hideIf('customsubscriptioninterval', 'subscriptioninterval', 'neq', 'custom');
+        $mform->hideIf('customsubscriptionintervalcount', 'subscriptioninterval', 'neq', 'custom');
+
+        $mform->addElement('advcheckbox', 'anchorbilling', get_string('anchoredbilling', 'paygw_stripe'),
+            get_string('anchoredbilling_help', 'paygw_stripe'));
+
+        $mform->addElement('advcheckbox', 'firstintervalfree', get_string('trialperiod', 'paygw_stripe'),
+            get_string('trialperiod_help', 'paygw_stripe'));
     }
 
     /**

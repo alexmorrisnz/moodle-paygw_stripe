@@ -59,5 +59,19 @@
         <INDEX NAME="paymentaccountid" UNIQUE="true" FIELDS="paymentaccountid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="paygw_stripe_subscriptions" COMMENT="Stores subscription details">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="subscriptionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="customerid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe customer ID"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Session status"/>
+        <FIELD NAME="productid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe product ID"/>
+        <FIELD NAME="priceid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe price ID"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+    </TABLE>
   </TABLES>
 </XMLDB>
