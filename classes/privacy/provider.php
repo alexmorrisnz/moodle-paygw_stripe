@@ -58,6 +58,14 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
             'privacy:metadata:stripe_intents'
         );
 
+        $collection->add_database_table(
+            'paygw_stripe_subscriptions',
+            [
+                'userid' => 'privacy:metadata:stripe_subscriptions:userid'
+            ],
+            'privacy:metadata:stripe_subscriptions'
+        );
+
         return $collection;
     }
 }

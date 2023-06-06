@@ -112,3 +112,6 @@ $string['privacy:metadata:stripe_customers:customerid'] = 'Customer ID returned 
 
 $string['privacy:metadata:stripe_intents'] = 'Stores payment intent data to track payment history';
 $string['privacy:metadata:stripe_intents:userid'] = 'Moodle user ID';
+
+$string['privacy:metadata:stripe_subscriptions'] = 'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
+$string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
