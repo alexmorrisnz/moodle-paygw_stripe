@@ -75,7 +75,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            get_config('paygw_stripe')->version,
+            get_config('paygw_stripe')->release,
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }

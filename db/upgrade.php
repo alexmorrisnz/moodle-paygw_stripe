@@ -201,7 +201,7 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
                     ]);
                     Stripe::setAppInfo(
                         'Moodle Stripe Payment Gateway',
-                        get_config('paygw_stripe')->version,
+                        get_config('paygw_stripe')->release,
                         'https://github.com/alexmorrisnz/moodle-paygw_stripe'
                     );
                     $webhooks = $DB->get_records('paygw_stripe_webhooks', ['paymentaccountid' => $account->get('id')]);
