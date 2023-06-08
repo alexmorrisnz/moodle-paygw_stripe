@@ -75,7 +75,7 @@ class stripe_helper {
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
-            get_config('paygw_stripe')->release,
+            get_config('paygw_stripe')->version,
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
     }
@@ -259,11 +259,13 @@ class stripe_helper {
             $price = $this->create_price($currency, $product->id, $unitamount, $config->enableautomatictax == 1,
                 $config->defaulttaxbehavior, $subscription);
         } else {
+            // Check if the price details mismatch in any way.
             if ($price->unit_amount != $unitamount || $price->currency != $currency ||
                 (is_array($subscription) && $price->type != 'recurring') ||
                 (is_array($subscription) && $price->type == 'recurring' &&
                     ($price->recurring->toArray()['interval'] != $subscription['interval'] ||
-                        $price->recurring->toArray()['interval_count'] != $subscription['interval_count']))) {
+                        $price->recurring->toArray()['interval_count'] != $subscription['interval_count'])) ||
+                ($price->type == 'recurring' && !is_array($subscription))) {
                 // We cannot update the price or currency, so we must create a new price.
                 $price->updateAttributes(['active' => false]);
                 $price->save();
@@ -274,6 +276,10 @@ class stripe_helper {
             if ($config->enableautomatictax == 1 && (!isset($price->tax_behavior) || $price->tax_behavior === 'unspecified')) {
                 $price->updateAttributes(['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
                 $price->save();
+            }
+            if ($product->name != $description) {
+                $product->name = $description;
+                $product->save();
             }
         }
 
