@@ -411,7 +411,8 @@ class stripe_helper {
             // Create checkout session to set up default payment source for customer.
             $session = $this->stripe->checkout->sessions->create([
                 'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/pay.php?component=' . $component . '&paymentarea=' .
-                    $paymentarea . '&itemid=' . $itemid . '&description=' . urlencode($description) . '&session_id={CHECKOUT_SESSION_ID}',
+                    $paymentarea . '&itemid=' . $itemid . '&description=' . urlencode($description) .
+                    '&session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                     $paymentarea . '&itemid=' . $itemid,
                 'payment_method_types' => $config->paymentmethods,
