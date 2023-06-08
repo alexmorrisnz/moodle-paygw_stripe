@@ -469,7 +469,7 @@ class stripe_helper {
             }
         }
         if ($config->firstintervalfree && !$config->anchorbilling) {
-            $subscriptiondata['trial_end'] = $this->get_trial_end_date($config);
+            $subscriptiondata['trial_end'] = $this->get_trial_end_date($config)->getTimestamp();
         }
 
         $subscription = $this->stripe->subscriptions->create($subscriptiondata);
