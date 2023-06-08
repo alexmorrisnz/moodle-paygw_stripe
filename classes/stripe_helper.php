@@ -277,10 +277,10 @@ class stripe_helper {
                 $price->updateAttributes(['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
                 $price->save();
             }
-            if ($product->name != $description) {
-                $product->name = $description;
-                $product->save();
-            }
+        }
+        if ($product->name != $description) {
+            $product->name = $description;
+            $product->save();
         }
 
         return [$product, $price];
@@ -375,6 +375,9 @@ class stripe_helper {
      * @param string|null $sessionid
      * @return string|null
      * @throws ApiErrorException
+     * @throws \coding_exception
+     * @throws \dml_exception
+     * @throws \moodle_exception
      */
     public function generate_subscription(object $config, payable $payable, string $description, float $cost, string $component,
         string $paymentarea, string $itemid, string $sessionid = null): ?string {
@@ -408,7 +411,7 @@ class stripe_helper {
             // Create checkout session to set up default payment source for customer.
             $session = $this->stripe->checkout->sessions->create([
                 'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/pay.php?component=' . $component . '&paymentarea=' .
-                    $paymentarea . '&itemid=' . $itemid . '&description=' . $description . '&session_id={CHECKOUT_SESSION_ID}',
+                    $paymentarea . '&itemid=' . $itemid . '&description=' . urlencode($description) . '&session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                     $paymentarea . '&itemid=' . $itemid,
                 'payment_method_types' => $config->paymentmethods,

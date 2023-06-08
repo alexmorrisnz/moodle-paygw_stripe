@@ -33,7 +33,7 @@ require_login();
 $component = required_param('component', PARAM_ALPHANUMEXT);
 $paymentarea = required_param('paymentarea', PARAM_ALPHANUMEXT);
 $itemid = required_param('itemid', PARAM_INT);
-$description = required_param('description', PARAM_TEXT);
+$description = urldecode(required_param('description', PARAM_TEXT));
 $sessionid = optional_param('session_id', null, PARAM_TEXT);
 
 $config = (object) helper::get_gateway_configuration($component, $paymentarea, $itemid, 'stripe');
