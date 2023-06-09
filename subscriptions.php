@@ -27,7 +27,6 @@ use core_payment\helper;
 use paygw_stripe\stripe_helper;
 
 require('../../../config.php');
-require_once(__DIR__ . '/.extlib/stripe-php/init.php');
 
 require_login();
 

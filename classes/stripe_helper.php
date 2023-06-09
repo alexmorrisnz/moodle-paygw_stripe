@@ -800,7 +800,7 @@ class stripe_helper {
         $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid, ['expand' => ['schedule']]);
 
         $cancellink =
-            new moodle_url('/payment/gateway/stripe/subscriptions.php', ['action' => 'cancel', 'subscriptionid' => $moodlesub->id]);
+            new moodle_url('/payment/gateway/stripe/cancel.php', ['subscriptionid' => $moodlesub->id]);
         $portallink =
             new moodle_url('/payment/gateway/stripe/subscriptions.php', ['action' => 'portal', 'subscriptionid' => $moodlesub->id]);
 

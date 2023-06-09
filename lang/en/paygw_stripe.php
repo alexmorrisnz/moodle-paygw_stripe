@@ -59,6 +59,8 @@ $string['trialperiod'] = 'Trial Period';
 $string['trialperiod_help'] = 'E.g. You register on the 25th of April, April is free and billing starts on the 1st May';
 $string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
 $string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
+$string['cancelsubscription'] = 'Cancel subscription';
+$string['cancelsubscriptionconfirm'] = 'Are you sure you wish to cancel this subscription?';
 
 $string['customsubscriptioninterval:day'] = 'Day';
 $string['customsubscriptioninterval:week'] = 'Week';
