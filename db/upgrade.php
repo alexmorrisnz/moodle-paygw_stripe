@@ -39,6 +39,8 @@ use Stripe\StripeClient;
 function xmldb_paygw_stripe_upgrade($oldversion) {
     global $DB, $CFG;
 
+    require_once($CFG->dirroot . '/payment/gateway/stripe/db/upgradelib.php');
+
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2021082800) {
@@ -189,38 +191,27 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
 
     if ($oldversion < 2023052500) {
         // Update stripe webhooks to include subscription deleted event.
-        $gateways = $DB->get_records('payment_gateways', ['gateway' => 'stripe']);
-        foreach ($gateways as $gatewayrecord) {
-            $account = new account($gatewayrecord->accountid);
-            $gateway = $account->get_gateways(false)['stripe'] ?? null;
-            if ($gateway != null) {
-                $config = $gateway->get_configuration();
-                try {
-                    $stripe = new StripeClient([
-                        "api_key" => $config['secretkey']
-                    ]);
-                    Stripe::setAppInfo(
-                        'Moodle Stripe Payment Gateway',
-                        get_config('paygw_stripe')->version,
-                        'https://github.com/alexmorrisnz/moodle-paygw_stripe'
-                    );
-                    $webhooks = $DB->get_records('paygw_stripe_webhooks', ['paymentaccountid' => $account->get('id')]);
-                    foreach ($webhooks as $webhookrecord) {
-                        $stripe->webhookEndpoints->update($webhookrecord->webhookid, ['enabled_events' => [
-                            'checkout.session.completed',
-                            'checkout.session.async_payment_succeeded',
-                            'checkout.session.async_payment_failed',
-                            'customer.subscription.deleted',
-                        ]]);
-                    }
-                } catch (Exception $ignored) {
-                    // Ignore errors, the api keys we are given may be wrong.
-                    continue;
-                }
-            }
-        }
+        paygw_stripe_update_webhooks([
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded',
+            'checkout.session.async_payment_failed',
+            'customer.subscription.deleted',
+        ]);
 
         upgrade_plugin_savepoint(true, 2023052500, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2023071200) {
+        // Update stripe webhooks to include subscription updated event.
+        paygw_stripe_update_webhooks([
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded',
+            'checkout.session.async_payment_failed',
+            'customer.subscription.deleted',
+            'customer.subscription.updated',
+        ]);
+
+        upgrade_plugin_savepoint(true, 2023071200, 'paygw', 'stripe');
     }
 
     return true;

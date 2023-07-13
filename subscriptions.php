@@ -72,7 +72,10 @@ foreach ($subscriptions as $subscription) {
     $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');
     $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
-    $table->data[] = $stripehelper->get_subscription_table_data($subscription);
+    $row = $stripehelper->get_subscription_table_data($subscription);
+    if ($row != null) {
+        $table->data[] = $row;
+    }
 }
 
 echo \html_writer::table($table);

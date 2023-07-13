@@ -677,7 +677,8 @@ class stripe_helper {
                 'checkout.session.completed',
                 'checkout.session.async_payment_succeeded',
                 'checkout.session.async_payment_failed',
-                'customer.subscription.deleted'
+                'customer.subscription.deleted',
+                'customer.subscription.updated',
             ],
         ]);
 
@@ -751,6 +752,14 @@ class stripe_helper {
                 }
                 $this->cancel_subscription($moodlesub, false);
                 break;
+            case 'customer.subscription.updated':
+                if (!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
+                    return false;
+                }
+                $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
+                $moodlesub->status = $subscription->status;
+                $DB->update_record('paygw_stripe_subscriptions', $moodlesub);
+                break;
             default:
                 return false;
         }
@@ -794,24 +803,29 @@ class stripe_helper {
      * @throws \coding_exception
      * @throws \moodle_exception
      */
-    public function get_subscription_table_data(\stdClass $moodlesub): array {
+    public function get_subscription_table_data(\stdClass $moodlesub): ?array {
         $product = $this->stripe->products->retrieve($moodlesub->productid);
         $price = $this->stripe->prices->retrieve($moodlesub->priceid);
-        $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid, ['expand' => ['schedule']]);
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid, ['expand' => ['schedule']]);
 
-        $cancellink =
-            new moodle_url('/payment/gateway/stripe/cancel.php', ['subscriptionid' => $moodlesub->id]);
-        $portallink =
-            new moodle_url('/payment/gateway/stripe/subscriptions.php', ['action' => 'portal', 'subscriptionid' => $moodlesub->id]);
+            $cancellink =
+                new moodle_url('/payment/gateway/stripe/cancel.php', ['subscriptionid' => $moodlesub->id]);
+            $portallink =
+                new moodle_url('/payment/gateway/stripe/subscriptions.php',
+                    ['action' => 'portal', 'subscriptionid' => $moodlesub->id]);
 
-        return [
-            $product->name,
-            $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' . $price->recurring->interval,
-            userdate($subscription->current_period_end),
-            get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
-            $moodlesub->status != 'canceled' ? '<a href="' . $portallink->out() . '">Update Payment Method</a>' : '',
-            $moodlesub->status != 'canceled' ? '<a href="' . $cancellink->out() . '">Cancel</a>' : '',
-        ];
+            return [
+                $product->name,
+                $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' . $price->recurring->interval,
+                userdate($subscription->current_period_end),
+                get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
+                $moodlesub->status != 'canceled' ? '<a href="' . $portallink->out() . '">Update Payment Method</a>' : '',
+                $moodlesub->status != 'canceled' ? '<a href="' . $cancellink->out() . '">Cancel</a>' : '',
+            ];
+        } catch (ApiErrorException $err) {
+            return null;
+        }
     }
 
     /**
