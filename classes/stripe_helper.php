@@ -532,7 +532,7 @@ class stripe_helper {
      * @return float
      */
     public function get_unit_amount(float $cost, string $currency): float {
-        if (in_array($currency, gateway::get_zero_decimal_currencies())) {
+        if (in_array(strtoupper($currency), gateway::get_zero_decimal_currencies())) {
             return $cost;
         }
         return $cost * 100;
@@ -546,7 +546,7 @@ class stripe_helper {
      * @return string
      */
     public function get_localised_cost(float $cost, string $currency): string {
-        if (!in_array($currency, gateway::get_zero_decimal_currencies())) {
+        if (!in_array(strtoupper($currency), gateway::get_zero_decimal_currencies())) {
             $cost = $cost / 100;
         }
 
