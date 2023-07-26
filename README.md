@@ -33,3 +33,7 @@ This plugin can be used with these payment gateways:
 * NetBanking
 
 Some of those payment gateways will only work in Stripe if you have provided additional verification details.
+
+## Warm Thanks
+
+Thanks to [E-learning Co., Ltd](https://www.e-learning.co.jp/) for sponsoring the work to add subscription support to this plugin.
