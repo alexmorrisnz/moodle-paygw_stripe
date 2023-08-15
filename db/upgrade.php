@@ -174,7 +174,7 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
         $table->add_field('subscriptionid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
         $table->add_field('customerid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('status', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('status', XMLDB_TYPE_CHAR, '100', null, null, null, null);
         $table->add_field('productid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
         $table->add_field('priceid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
 
@@ -212,6 +212,18 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         ]);
 
         upgrade_plugin_savepoint(true, 2023071200, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2023081500) {
+        // Fix inconsistent database schema issues with subscriptions table.
+        // Subscription ID should be char, status is nullable.
+        $table = new xmldb_table('paygw_stripe_subscriptions');
+        $subscriptionidfield = new xmldb_field('subscriptionid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $dbman->change_field_type($table, $subscriptionidfield);
+        $statusfield = new xmldb_field('status', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $dbman->change_field_notnull($table, $statusfield);
+
+        upgrade_plugin_savepoint(true, 2023081500, 'paygw', 'stripe');
     }
 
     return true;
