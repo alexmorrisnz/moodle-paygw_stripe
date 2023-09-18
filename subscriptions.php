@@ -54,6 +54,9 @@ if ($subid != null) {
 
 echo $OUTPUT->header();
 
+echo html_writer::tag('p', get_string('subscriptionssubheading', 'paygw_stripe'),
+    ['class' => 'paygw_stripe-subscriptions-subheading']);
+
 $table = new \html_table();
 $table->head = [
     get_string('product', 'paygw_stripe'),

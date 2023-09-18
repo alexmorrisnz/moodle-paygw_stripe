@@ -54,7 +54,8 @@ $string['customsubscriptioninterval'] = 'Custom Subscription Period';
 $string['customsubscriptionintervalcount'] = 'Custom Subscription Period Interval';
 $string['customsubscriptionintervalcount_help'] = '';
 $string['anchoredbilling'] = 'Use the start of the current interval as a fixed billing date';
-$string['anchoredbilling_help'] = 'E.g. You subscribe in the middle of the month, you will be billed immediately for the current month';
+$string['anchoredbilling_help'] =
+    'E.g. You subscribe in the middle of the month, you will be billed immediately for the current month';
 $string['trialperiod'] = 'Trial Period';
 $string['trialperiod_help'] = 'E.g. You register on the 25th of April, April is free and billing starts on the 1st May';
 $string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
@@ -67,6 +68,8 @@ $string['scheduledrenewal'] = 'Scheduled Renewal';
 $string['status'] = 'Status';
 $string['updatepaymentmethod'] = 'Update Payment Method';
 $string['cancel'] = 'Cancel';
+$string['subscriptionssubheading'] =
+    'This page lists the subscriptions you have purchased. You can cancel subscriptions here, cancellations will be processed immediately and you will not be able to enter the course again.';
 
 $string['customsubscriptioninterval:day'] = 'Day';
 $string['customsubscriptioninterval:week'] = 'Week';
@@ -121,5 +124,6 @@ $string['privacy:metadata:stripe_customers:customerid'] = 'Customer ID returned 
 $string['privacy:metadata:stripe_intents'] = 'Stores payment intent data to track payment history';
 $string['privacy:metadata:stripe_intents:userid'] = 'Moodle user ID';
 
-$string['privacy:metadata:stripe_subscriptions'] = 'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
+$string['privacy:metadata:stripe_subscriptions'] =
+    'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
 $string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';

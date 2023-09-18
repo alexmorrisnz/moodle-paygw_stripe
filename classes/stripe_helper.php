@@ -821,7 +821,8 @@ class stripe_helper {
                 get_string('customsubscriptioninterval:' . $price->recurring->interval, 'paygw_stripe'),
                 userdate($subscription->current_period_end),
                 get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
-                $moodlesub->status != 'canceled' ? \html_writer::link($portallink, get_string('updatepaymentmethod', 'paygw_stripe')) : '',
+                $moodlesub->status != 'canceled' ?
+                    \html_writer::link($portallink, get_string('updatepaymentmethod', 'paygw_stripe')) : '',
                 $moodlesub->status != 'canceled' ? \html_writer::link($cancellink, get_string('cancel', 'paygw_stripe')) : '',
             ];
         } catch (ApiErrorException $err) {
