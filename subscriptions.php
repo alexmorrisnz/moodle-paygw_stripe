@@ -56,10 +56,10 @@ echo $OUTPUT->header();
 
 $table = new \html_table();
 $table->head = [
-    'Product',
-    'Fee',
-    'Scheduled Renewal',
-    'Status',
+    get_string('product', 'paygw_stripe'),
+    get_string('fee', 'paygw_stripe'),
+    get_string('scheduledrenewal', 'paygw_stripe'),
+    get_string('status', 'paygw_stripe'),
     '',
     '',
 ];

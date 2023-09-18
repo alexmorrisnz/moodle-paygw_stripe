@@ -817,11 +817,12 @@ class stripe_helper {
 
             return [
                 $product->name,
-                $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' . $price->recurring->interval,
+                $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' .
+                get_string('customsubscriptioninterval:' . $price->recurring->interval, 'paygw_stripe'),
                 userdate($subscription->current_period_end),
                 get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
-                $moodlesub->status != 'canceled' ? '<a href="' . $portallink->out() . '">Update Payment Method</a>' : '',
-                $moodlesub->status != 'canceled' ? '<a href="' . $cancellink->out() . '">Cancel</a>' : '',
+                $moodlesub->status != 'canceled' ? \html_writer::link($portallink, get_string('updatepaymentmethod', 'paygw_stripe')) : '',
+                $moodlesub->status != 'canceled' ? \html_writer::link($cancellink, get_string('cancel', 'paygw_stripe')) : '',
             ];
         } catch (ApiErrorException $err) {
             return null;

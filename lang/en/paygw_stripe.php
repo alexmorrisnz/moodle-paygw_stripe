@@ -61,6 +61,12 @@ $string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method 
 $string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
 $string['cancelsubscription'] = 'Cancel subscription';
 $string['cancelsubscriptionconfirm'] = 'Are you sure you wish to cancel this subscription?';
+$string['product'] = 'Product';
+$string['fee'] = 'Fee';
+$string['scheduledrenewal'] = 'Scheduled Renewal';
+$string['status'] = 'Status';
+$string['updatepaymentmethod'] = 'Update Payment Method';
+$string['cancel'] = 'Cancel';
 
 $string['customsubscriptioninterval:day'] = 'Day';
 $string['customsubscriptioninterval:week'] = 'Week';
