@@ -34,7 +34,6 @@ namespace Stripe;
  * @property \Stripe\Service\Issuing\IssuingServiceFactory $issuing
  * @property \Stripe\Service\MandateService $mandates
  * @property \Stripe\Service\OAuthService $oauth
- * @property \Stripe\Service\OrderService $orders
  * @property \Stripe\Service\PaymentIntentService $paymentIntents
  * @property \Stripe\Service\PaymentLinkService $paymentLinks
  * @property \Stripe\Service\PaymentMethodService $paymentMethods
@@ -52,11 +51,11 @@ namespace Stripe;
  * @property \Stripe\Service\SetupIntentService $setupIntents
  * @property \Stripe\Service\ShippingRateService $shippingRates
  * @property \Stripe\Service\Sigma\SigmaServiceFactory $sigma
- * @property \Stripe\Service\SkuService $skus
  * @property \Stripe\Service\SourceService $sources
  * @property \Stripe\Service\SubscriptionItemService $subscriptionItems
  * @property \Stripe\Service\SubscriptionScheduleService $subscriptionSchedules
  * @property \Stripe\Service\SubscriptionService $subscriptions
+ * @property \Stripe\Service\Tax\TaxServiceFactory $tax
  * @property \Stripe\Service\TaxCodeService $taxCodes
  * @property \Stripe\Service\TaxRateService $taxRates
  * @property \Stripe\Service\Terminal\TerminalServiceFactory $terminal
@@ -76,10 +75,15 @@ class StripeClient extends BaseStripeClient
 
     public function __get($name)
     {
+        return $this->getService($name);
+    }
+
+    public function getService($name)
+    {
         if (null === $this->coreServiceFactory) {
             $this->coreServiceFactory = new \Stripe\Service\CoreServiceFactory($this);
         }
 
-        return $this->coreServiceFactory->__get($name);
+        return $this->coreServiceFactory->getService($name);
     }
 }

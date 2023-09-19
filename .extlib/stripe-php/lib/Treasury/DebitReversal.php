@@ -5,14 +5,12 @@
 namespace Stripe\Treasury;
 
 /**
- * You can reverse some <a
- * href="https://stripe.com/docs/api#received_debits">ReceivedDebits</a> depending
- * on their network and source flow. Reversing a ReceivedDebit leads to the
- * creation of a new object known as a DebitReversal.
+ * You can reverse some <a href="https://stripe.com/docs/api#received_debits">ReceivedDebits</a> depending on their network and source flow. Reversing a ReceivedDebit leads to the creation of a new object known as a DebitReversal.
  *
  * @property string $id Unique identifier for the object.
  * @property string $object String representing the object's type. Objects of the same type share the same value.
  * @property int $amount Amount (in cents) transferred.
+ * @property int $created Time at which the object was created. Measured in seconds since the Unix epoch.
  * @property string $currency Three-letter <a href="https://www.iso.org/iso-4217-currency-codes.html">ISO currency code</a>, in lowercase. Must be a <a href="https://stripe.com/docs/currencies">supported currency</a>.
  * @property null|string $financial_account The FinancialAccount to reverse funds from.
  * @property null|string $hosted_regulatory_receipt_url A <a href="https://stripe.com/docs/treasury/moving-money/regulatory-receipts">hosted transaction receipt</a> URL that is provided when money movement is considered regulated under Stripe's money transmission licenses.
