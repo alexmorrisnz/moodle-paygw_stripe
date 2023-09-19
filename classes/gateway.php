@@ -134,6 +134,7 @@ class gateway extends \core_payment\gateway {
         ]);
         $mform->setType('subscriptioninterval', PARAM_TEXT);
         $mform->setDefault('subscriptioninterval', 'monthly');
+        $mform->hideIf('subscriptioninterval', 'type', 'neq', 'subscription');
 
         $mform->addElement('select', 'customsubscriptioninterval', get_string('customsubscriptioninterval', 'paygw_stripe'), [
             'day' => get_string('customsubscriptioninterval:day', 'paygw_stripe'),
@@ -156,9 +157,11 @@ class gateway extends \core_payment\gateway {
 
         $mform->addElement('advcheckbox', 'anchorbilling', get_string('anchoredbilling', 'paygw_stripe'),
             get_string('anchoredbilling_help', 'paygw_stripe'));
+        $mform->hideIf('anchorbilling', 'type', 'neq', 'subscription');
 
         $mform->addElement('advcheckbox', 'firstintervalfree', get_string('trialperiod', 'paygw_stripe'),
             get_string('trialperiod_help', 'paygw_stripe'));
+        $mform->hideIf('firstintervalfree', 'type', 'neq', 'subscription');
     }
 
     /**
