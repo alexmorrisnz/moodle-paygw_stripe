@@ -47,7 +47,8 @@ function paygw_stripe_update_webhooks(array $events) {
             $config = $gateway->get_configuration();
             try {
                 $stripe = new StripeClient([
-                    "api_key" => $config['secretkey']
+                    'api_key' => $config['secretkey'],
+                    'stripe_version' => '2023-08-16',
                 ]);
                 Stripe::setAppInfo(
                     'Moodle Stripe Payment Gateway',

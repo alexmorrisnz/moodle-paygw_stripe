@@ -71,7 +71,8 @@ class stripe_helper {
     public function __construct(string $apikey, string $secretkey) {
         $this->apikey = $apikey;
         $this->stripe = new StripeClient([
-            "api_key" => $secretkey
+            'api_key' => $secretkey,
+            'stripe_version' => '2023-08-16',
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
@@ -267,20 +268,19 @@ class stripe_helper {
                         $price->recurring->toArray()['interval_count'] != $subscription['interval_count'])) ||
                 ($price->type == 'recurring' && !is_array($subscription))) {
                 // We cannot update the price or currency, so we must create a new price.
-                $price->updateAttributes(['active' => false]);
-                $price->save();
+                $this->stripe->prices->update($price->id, ['active' => false]);
                 $price = $this->create_price($currency, $product->id, $unitamount, $config->enableautomatictax == 1,
                     $config->defaulttaxbehavior, $subscription);
             }
             // Set tax behavior if not set already.
             if ($config->enableautomatictax == 1 && (!isset($price->tax_behavior) || $price->tax_behavior === 'unspecified')) {
                 $price->updateAttributes(['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
-                $price->save();
+                $price = $this->stripe->prices->update($price->id, ['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
             }
         }
         if ($product->name != $description) {
             $product->name = $description;
-            $product->save();
+            $product = $this->stripe->products->update($product->id, ['name' => $description]);
         }
 
         return [$product, $price];
@@ -400,10 +400,8 @@ class stripe_helper {
             if ($session->status != 'complete') {
                 redirect(new moodle_url('/'), get_string('failedtosetdefaultpaymentmethod', 'paygw_stripe'));
             } else {
-                $customer->updateAttributes(['invoice_settings' =>
+                $customer = $this->stripe->customers->update($customer->id, ['invoice_settings' =>
                     ['default_payment_method' => $session->setup_intent->payment_method]]);
-                $customer->save();
-                $customer->refresh();
             }
         }
 
