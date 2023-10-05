@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 
 use core_payment\account;
+use paygw_stripe\stripe_helper;
 use Stripe\Stripe;
 use Stripe\StripeClient;
 
@@ -48,7 +49,7 @@ function paygw_stripe_update_webhooks(array $events) {
             try {
                 $stripe = new StripeClient([
                     'api_key' => $config['secretkey'],
-                    'stripe_version' => '2023-08-16',
+                    'stripe_version' => stripe_helper::$apiversion,
                 ]);
                 Stripe::setAppInfo(
                     'Moodle Stripe Payment Gateway',
@@ -58,6 +59,43 @@ function paygw_stripe_update_webhooks(array $events) {
                 $webhooks = $DB->get_records('paygw_stripe_webhooks', ['paymentaccountid' => $account->get('id')]);
                 foreach ($webhooks as $webhookrecord) {
                     $stripe->webhookEndpoints->update($webhookrecord->webhookid, ['enabled_events' => $events]);
+                }
+            } catch (Exception $ignored) {
+                // Ignore errors, the api keys we are given may be wrong.
+                continue;
+            }
+        }
+    }
+}
+
+/**
+ * Delete webhooks, they will be recreated when used later.
+ *
+ * @return void
+ */
+function paygw_stripe_delete_webhooks() {
+    global $DB;
+
+    $gateways = $DB->get_records('payment_gateways', ['gateway' => 'stripe']);
+    foreach ($gateways as $gatewayrecord) {
+        $account = new account($gatewayrecord->accountid);
+        $gateway = $account->get_gateways(false)['stripe'] ?? null;
+        if ($gateway != null) {
+            $config = $gateway->get_configuration();
+            try {
+                $stripe = new StripeClient([
+                    'api_key' => $config['secretkey'],
+                    'stripe_version' => stripe_helper::$apiversion,
+                ]);
+                Stripe::setAppInfo(
+                    'Moodle Stripe Payment Gateway',
+                    get_config('paygw_stripe')->version,
+                    'https://github.com/alexmorrisnz/moodle-paygw_stripe'
+                );
+                $webhooks = $DB->get_records('paygw_stripe_webhooks', ['paymentaccountid' => $account->get('id')]);
+                foreach ($webhooks as $webhookrecord) {
+                    $stripe->webhookEndpoints->delete($webhookrecord->webhookid);
+                    $DB->delete_records('paygw_stripe_webhooks', ['id' => $webhookrecord->id]);
                 }
             } catch (Exception $ignored) {
                 // Ignore errors, the api keys we are given may be wrong.

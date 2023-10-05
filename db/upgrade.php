@@ -226,5 +226,11 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2023081500, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2023100500) {
+        // API version upgrade, delete webhooks, so they can be recreated later with the correct version.
+        paygw_stripe_delete_webhooks();
+        upgrade_plugin_savepoint(true, 2023100500, 'paygw', 'stripe');
+    }
+
     return true;
 }

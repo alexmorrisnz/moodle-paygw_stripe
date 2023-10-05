@@ -62,6 +62,8 @@ class stripe_helper {
      */
     private $apikey;
 
+    public static $apiversion = '2023-08-16';
+
     /**
      * Initialise the Stripe API client.
      *
@@ -72,7 +74,7 @@ class stripe_helper {
         $this->apikey = $apikey;
         $this->stripe = new StripeClient([
             'api_key' => $secretkey,
-            'stripe_version' => '2023-08-16',
+            'stripe_version' => self::$apiversion,
         ]);
         Stripe::setAppInfo(
             'Moodle Stripe Payment Gateway',
@@ -678,6 +680,7 @@ class stripe_helper {
                 'customer.subscription.deleted',
                 'customer.subscription.updated',
             ],
+            'api_version' => self::$apiversion,
         ]);
 
         $datum = new \stdClass();
