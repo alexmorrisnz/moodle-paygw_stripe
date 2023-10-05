@@ -62,6 +62,9 @@ class stripe_helper {
      */
     private $apikey;
 
+    /**
+     * @var string Stripe API version set explicitly in Stripe client.
+     */
     public static $apiversion = '2023-08-16';
 
     /**
