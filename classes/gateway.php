@@ -97,7 +97,8 @@ class gateway extends \core_payment\gateway {
             'sofort' => get_string('paymentmethod:sofort', 'paygw_stripe'),
             'upi' => get_string('paymentmethod:upi', 'paygw_stripe'),
             'netbanking' => get_string('paymentmethod:netbanking', 'paygw_stripe'),
-            'wechat_pay' => get_string('paymentmethod:wechat_pay', 'paygw_stripe')
+            'wechat_pay' => get_string('paymentmethod:wechat_pay', 'paygw_stripe'),
+            'klarna' => get_string('paymentmethod:klarna', 'paygw_stripe')
         ];
         $method = $mform->addElement('select', 'paymentmethods', get_string('paymentmethods', 'paygw_stripe'), $paymentmethods);
         $mform->setType('paymentmethods', PARAM_TEXT);
