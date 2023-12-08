@@ -31,6 +31,7 @@ This plugin can be used with these payment gateways:
 * Sofort
 * UPI
 * NetBanking
+* Klarna
 
 Some of those payment gateways will only work in Stripe if you have provided additional verification details.
 
