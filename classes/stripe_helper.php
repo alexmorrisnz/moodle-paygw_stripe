@@ -608,7 +608,7 @@ class stripe_helper {
 
         $intent = new \stdClass();
         $intent->userid = $USER->id;
-        $intent->paymentintent = $session->payment_intent;
+        $intent->paymentintent = empty($session->payment_intent)?'':$session->payment_intent;
         $intent->customerid = $session->customer->id;
         $intent->amounttotal = $session->amount_total;
         $intent->paymentstatus = $session->payment_status;
