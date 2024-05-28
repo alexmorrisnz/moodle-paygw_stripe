@@ -70,6 +70,7 @@ $string['updatepaymentmethod'] = 'Update Payment Method';
 $string['cancel'] = 'Cancel';
 $string['subscriptionssubheading'] =
     'This page lists the subscriptions you have purchased. You can cancel subscriptions here, cancellations will be processed immediately and you will not be able to enter the course again.';
+$string['automaticinvoices'] = 'Enable automatic invoicing';
 
 $string['customsubscriptioninterval:day'] = 'Day';
 $string['customsubscriptioninterval:week'] = 'Week';
