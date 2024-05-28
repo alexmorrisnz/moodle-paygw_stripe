@@ -342,7 +342,7 @@ class stripe_helper {
             'invoice_creation' => [
                 'enabled' => $config->automaticinvoicing == 1,
                 'invoice_data' => [
-                    'issuer' => [ 
+                    'issuer' => [
                         'type' => "self",
                     ],
                     'description' => $description,
