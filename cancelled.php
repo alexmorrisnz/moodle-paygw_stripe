@@ -40,4 +40,8 @@ if ($component == 'enrol_fee' && $paymentarea == 'fee') {
     }
 }
 
+if (!(empty($itemid))) {
+	$url = new moodle_url('/blocks/iomad_commerce/edit_order_form.php?id='.$itemid);
+}
+
 redirect($url, get_string('paymentcancelled', 'paygw_stripe'));
