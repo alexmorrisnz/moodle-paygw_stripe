@@ -43,11 +43,7 @@ $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 $stripehelper->save_payment_status($sessionid);
 if ($stripehelper->is_paid($sessionid)) {
     // Deliver course.
-    $payable = helper::get_payable($component, $paymentarea, $itemid);
-    $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), helper::get_gateway_surcharge('stripe'));
-    $paymentid = helper::save_payment($payable->get_account_id(), $component, $paymentarea,
-        $itemid, $USER->id, $cost, $payable->get_currency(), 'stripe');
-    helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $USER->id);
+    $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
 
     // Find redirection.
     $url = helper::get_success_url($component, $paymentarea, $itemid);

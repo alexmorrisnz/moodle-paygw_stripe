@@ -636,6 +636,23 @@ class stripe_helper {
     }
 
     /**
+     * Deliver course
+     *
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @param int $userid
+     * @return void
+     */
+    public function deliver_course(string $component, string $paymentarea,int $itemid, int $userid) {
+        $payable = helper::get_payable($component, $paymentarea, $itemid);
+        $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), helper::get_gateway_surcharge('stripe'));
+        $paymentid = helper::save_payment($payable->get_account_id(), $component, $paymentarea,
+            $itemid, $userid, $cost, $payable->get_currency(), 'stripe');
+        helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $userid);
+    }
+
+    /**
      * Find and return webhook endpoint if it exists.
      * Retrieve secret from Moodle database and add to webhook object.
      *
@@ -727,13 +744,7 @@ class stripe_helper {
                 }
 
                 // Deliver course.
-                $payable = helper::get_payable($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
-                $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(),
-                    helper::get_gateway_surcharge('stripe'));
-                $paymentid = helper::save_payment($payable->get_account_id(), $metadata['component'], $metadata['paymentarea'],
-                    $metadata['itemid'], $intentrecord->userid, $cost, $payable->get_currency(), 'stripe');
-                helper::deliver_order($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], $paymentid,
-                    $intentrecord->userid);
+                $this->deliver_course($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], $intentrecord->userid);
 
                 // Notify user payment was successful.
                 $url = helper::get_success_url($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
