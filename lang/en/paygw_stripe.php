@@ -45,7 +45,7 @@ $string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclus
 $string['profilecat'] = 'Stripe Payment Subscriptions';
 $string['cancelsubscriptions'] = 'Change Subscriptions';
 $string['subscriptions'] = 'Subscriptions';
-$string['subscriptionsuccessful'] = 'Successfully subscribed';
+$string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
 $string['paymenttype'] = 'Payment Type';
 $string['paymenttype:onetime'] = 'One Time';
 $string['paymenttype:subscription'] = 'Subscription';
@@ -53,11 +53,12 @@ $string['subscriptioninterval'] = 'Subscription Period';
 $string['customsubscriptioninterval'] = 'Custom Subscription Period';
 $string['customsubscriptionintervalcount'] = 'Custom Subscription Period Interval';
 $string['customsubscriptionintervalcount_help'] = '';
-$string['anchoredbilling'] = 'Use the start of the current interval as a fixed billing date';
+$string['anchoredbilling'] = 'Use the start of the subscription interval as a fixed billing date.';
 $string['anchoredbilling_help'] =
-    'E.g. You subscribe in the middle of the month, you will be billed immediately for the current month';
+    'E.g. For a monthly subscription, billing will be done every 1st of the month. If a user subscribes in the middle of the month, they will be charged a prorated amount covering from the registration day to the end of the month';
 $string['trialperiod'] = 'Trial Period';
-$string['trialperiod_help'] = 'E.g. You register on the 25th of April, April is free and billing starts on the 1st May';
+$string['trialperiod_help'] = 'E.g. the first interval is free. If the subscription is created on the 24th April, a month is free and billing starts on the 24th May.<br/>
+    If billing happens at the start of the interval (e.g. on the 1st of the month), the pro-rated amount is waved. If a user registers on the 24th April, April is free and billing starts on the 1st May';
 $string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
 $string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
 $string['cancelsubscription'] = 'Cancel subscription';

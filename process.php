@@ -41,14 +41,28 @@ $config = (object) helper::get_gateway_configuration($component, $paymentarea, $
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
 $stripehelper->save_payment_status($sessionid);
-if ($stripehelper->is_paid($sessionid)) {
-    // Deliver course.
-    $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
 
-    // Find redirection.
-    $url = helper::get_success_url($component, $paymentarea, $itemid);
-    redirect($url, get_string('paymentsuccessful', 'paygw_stripe'), 0, 'success');
-} else if ($stripehelper->is_pending($sessionid)) {
-    redirect(new moodle_url('/'), get_string('paymentpending', 'paygw_stripe'));
+$sessionmode = $stripehelper->get_sessionmode($sessionid);
+
+if ($sessionmode === 'subscription') {
+    $subscriptionstatus = $stripehelper->get_subscription_status($sessionid);
+    if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
+        $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
+
+        // Find redirection.
+        $url = helper::get_success_url($component, $paymentarea, $itemid);
+        redirect($url, get_string('subscriptionsuccessful', 'paygw_stripe'), 0, 'success');
+    } else {
+        redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));
+    }
+} else if ($sessionmode === 'payment') {
+    if ($stripehelper->is_paid($sessionid)) {
+        $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
+
+        // Find redirection.
+        $url = helper::get_success_url($component, $paymentarea, $itemid);
+        redirect($url, get_string('paymentsuccessful', 'paygw_stripe'), 0, 'success');
+    } else if ($stripehelper->is_pending($sessionid)) {
+        redirect(new moodle_url('/'), get_string('paymentpending', 'paygw_stripe'));
+    }
 }
-redirect(new moodle_url('/'), get_string('paymentcancelled', 'paygw_stripe'));
