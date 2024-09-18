@@ -118,6 +118,9 @@ class gateway extends \core_payment\gateway {
         ]);
         $mform->addHelpButton('defaulttaxbehavior', 'defaulttaxbehavior', 'paygw_stripe');
 
+        $mform->addElement('advcheckbox', 'automaticinvoices', get_string('automaticinvoices', 'paygw_stripe'));
+        $mform->setDefault('automaticinvoices', true);
+
         $mform->addElement('select', 'type', get_string('paymenttype', 'paygw_stripe'), [
             'onetime' => get_string('paymenttype:onetime', 'paygw_stripe'),
             'subscription' => get_string('paymenttype:subscription', 'paygw_stripe'),
