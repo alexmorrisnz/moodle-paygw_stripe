@@ -88,6 +88,7 @@ class gateway extends \core_payment\gateway {
 
         $paymentmethods = [
             'card' => get_string('paymentmethod:card', 'paygw_stripe'),
+            'affirm' => get_string('paymentmethod:affirm', 'paygw_stripe'),
             'alipay' => get_string('paymentmethod:alipay', 'paygw_stripe'),
             'bancontact' => get_string('paymentmethod:bancontact', 'paygw_stripe'),
             'eps' => get_string('paymentmethod:eps', 'paygw_stripe'),
