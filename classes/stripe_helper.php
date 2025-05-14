@@ -577,7 +577,13 @@ class stripe_helper {
 
         $intent = new \stdClass();
         $intent->userid = $USER->id;
-        $intent->paymentintent = $session->payment_intent;
+        if ($session->payment_intent == null) {
+            // Payment with coupon
+            if ($session->status == 'complete' && $session->payment_status) {}
+                $intent->paymentintent = 'COUPON'.'-'.time().'-'.rand(0, 1000000);
+        } else {
+            $intent->paymentintent = $session->payment_intent;
+        }
         $intent->customerid = $session->customer->id;
         $intent->amounttotal = $session->amount_total;
         $intent->paymentstatus = $session->payment_status;
