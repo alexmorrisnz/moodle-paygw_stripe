@@ -577,13 +577,7 @@ class stripe_helper {
 
         $intent = new \stdClass();
         $intent->userid = $USER->id;
-        if ($session->payment_intent == null) {
-            // Payment with coupon
-            if ($session->status == 'complete' && $session->payment_status) {}
-                $intent->paymentintent = 'COUPON'.'-'.time().'-'.rand(0, 1000000);
-        } else {
-            $intent->paymentintent = $session->payment_intent;
-        }
+        $intent->paymentintent = $session->payment_intent;
         $intent->customerid = $session->customer->id;
         $intent->amounttotal = $session->amount_total;
         $intent->paymentstatus = $session->payment_status;
@@ -602,10 +596,13 @@ class stripe_helper {
      */
     public function save_payment_status(string $sessionid) {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid, ['expand' => ['line_items', 'customer']]);
-
+        debugging('Session: '.var_export($session),DEBUG_DEVELOPER);
         if ($session->mode == 'subscription') {
             $this->save_subscription($session);
         } else {
+            if ($session->payment_intent == null) {
+                return;
+            }
             $this->save_payment_intent($session);
         }
     }
