@@ -596,14 +596,13 @@ class stripe_helper {
      */
     public function save_payment_status(string $sessionid) {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid, ['expand' => ['line_items', 'customer']]);
-        debugging('Session: '.var_export($session),DEBUG_DEVELOPER);
         if ($session->mode == 'subscription') {
             $this->save_subscription($session);
         } else {
-            if ($session->payment_intent == null) {
-                return;
+            //If payment_intent doesn't exists in session ie. when using 100% coupon there is nothing to save.
+            if ($session->payment_intent != null) {
+                $this->save_payment_intent($session);
             }
-            $this->save_payment_intent($session);
         }
     }
 
