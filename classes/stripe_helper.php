@@ -360,8 +360,13 @@ class stripe_helper {
             ],
             'allow_promotion_codes' => $config->allowpromotioncodes == 1,
             'customer_update' => [
+                'name' => 'auto',
                 'address' => 'auto',
             ],
+            'billing_address_collection' => 'required',
+            'tax_id_collection'=>[
+                    'enabled' => true
+            ]
         ]);
 
         return $session->id;
@@ -439,8 +444,11 @@ class stripe_helper {
                 'itemid' => $itemid,
             ],
             'customer_update' => [
+                'name' => 'auto',
                 'address' => 'auto',
             ],
+            'billing_address_collection' => 'required',
+            'tax_id_collection'=>['enabled' => true]
         ]);
 
         return $session->id;
