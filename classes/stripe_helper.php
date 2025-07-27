@@ -558,33 +558,34 @@ class stripe_helper {
     }
 
     /**
-     * Save payment intent status with customer and product details.
+     * Save checkout session status with customer and product details.
      *
      * @param Session $session
      * @return void
      * @throws \dml_exception
      */
-    private function save_payment_intent(Session $session) {
+    private function save_checkout_session(Session $session) {
         global $DB, $USER;
 
-        $intent = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent]);
-        if ($intent != null) {
-            $intent->status = $session->status;
-            $intent->paymentstatus = $session->payment_status;
-            $DB->update_record('paygw_stripe_intents', $intent);
+        $storedsession = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]);
+        if ($storedsession != null) {
+            $storedsession->status = $session->status;
+            $storedsession->paymentstatus = $session->payment_status;
+            $DB->update_record('paygw_stripe_checkout_sessions', $storedsession);
             return;
         }
 
-        $intent = new \stdClass();
-        $intent->userid = $USER->id;
-        $intent->paymentintent = $session->payment_intent;
-        $intent->customerid = $session->customer->id;
-        $intent->amounttotal = $session->amount_total;
-        $intent->paymentstatus = $session->payment_status;
-        $intent->status = $session->status;
-        $intent->productid = $session->line_items->first()->price->product;
+        $checkoutsession = new \stdClass();
+        $checkoutsession->checkoutsessionid = $session->id;
+        $checkoutsession->userid = $USER->id;
+        $checkoutsession->paymentintent = $session->payment_intent;
+        $checkoutsession->customerid = $session->customer->id;
+        $checkoutsession->amounttotal = $session->amount_total;
+        $checkoutsession->paymentstatus = $session->payment_status;
+        $checkoutsession->status = $session->status;
+        $checkoutsession->productid = $session->line_items->first()->price->product;
 
-        $DB->insert_record('paygw_stripe_intents', $intent);
+        $DB->insert_record('paygw_stripe_checkout_sessions', $checkoutsession);
     }
 
     /**
@@ -600,7 +601,7 @@ class stripe_helper {
         if ($session->mode == 'subscription') {
             $this->save_subscription($session);
         } else {
-            $this->save_payment_intent($session);
+            $this->save_checkout_session($session);
         }
     }
 
@@ -701,28 +702,29 @@ class stripe_helper {
             // Deliver the course if payment was successful or notify the user the payment failed.
             case 'checkout.session.async_payment_succeeded':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
-                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
-                if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
+                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
+                if (!($sessionrecord = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]))) {
                     return false;
                 }
                 $this->save_payment_status($session->id); // Update saved intent status.
 
                 // Deliver course.
-                $this->deliver_course($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], $intentrecord->userid);
+                $this->deliver_course($metadata['component'], $metadata['paymentarea'], $metadata['itemid'],
+                    $sessionrecord->userid);
 
                 // Notify user payment was successful.
                 $url = helper::get_success_url($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
-                $this->notify_user($intentrecord->userid, 'successful', ['url' => $url->out()]);
+                $this->notify_user($sessionrecord->userid, 'successful', ['url' => $url->out()]);
                 break;
             case 'checkout.session.async_payment_failed':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
-                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id, ['expand' => ['payment_intent']]);
-                if (!($intentrecord = $DB->get_record('paygw_stripe_intents', ['paymentintent' => $session->payment_intent->id]))) {
+                $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
+                if (!($sessionrecord = $DB->get_record('paygw_stripe_intents', ['checkoutsessionid' => $session->id]))) {
                     return false;
                 }
                 $this->save_payment_status($session->id); // Update saved intent status.
                 // Notify user payment failed.
-                $this->notify_user($intentrecord->userid, 'failed');
+                $this->notify_user($sessionrecord->userid, 'failed');
                 break;
             // Handle customer subscriptions being deleted.
             case 'customer.subscription.deleted':
@@ -941,9 +943,9 @@ class stripe_helper {
             'weekly' => new DateTime('this ' . $firstdayofweek . ' 00:00:00', new DateTimeZone('UTC')),
             'monthly' => new DateTime('first day of next month 00:00:00', new DateTimeZone('UTC')),
             'every3months' => (new DateTime('first day of this month 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('3 months')),
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('3 months')),
             'every6months' => (new DateTime('first day of this month 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('6 months')),
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('6 months')),
             'yearly' => new DateTime('first day of this year 00:00:00', new DateTimeZone('UTC')),
         ];
         if ($config->subscriptioninterval !== 'custom') {
@@ -951,12 +953,12 @@ class stripe_helper {
         }
         if ($config->customsubscriptioninterval === 'day') {
             return (new DateTime('this day 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString($config->customsubscriptionintervalcount .
-                    ' days'));
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString($config->customsubscriptionintervalcount .
+                ' days'));
         } else {
             return (new DateTime('first day of this ' . $config->customsubscriptioninterval . ' 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString($config->customsubscriptionintervalcount .
-                    ' ' . $config->customsubscriptioninterval . 's'));
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString($config->customsubscriptionintervalcount .
+                ' ' . $config->customsubscriptioninterval . 's'));
         }
     }
 
@@ -973,9 +975,9 @@ class stripe_helper {
             'weekly' => new DateTime('this day next week 00:00:00', new DateTimeZone('UTC')),
             'monthly' => new DateTime('this day next month 00:00:00', new DateTimeZone('UTC')),
             'every3months' => (new DateTime('this day next month 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('3 months')),
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('3 months')),
             'every6months' => (new DateTime('this day next month 00:00:00',
-                    new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('6 months')),
+                new DateTimeZone('UTC')))->add(DateInterval::createFromDateString('6 months')),
             'yearly' => new DateTime('this day next year 00:00:00', new DateTimeZone('UTC'))
         ];
         if ($config->subscriptioninterval !== 'custom') {
