@@ -28,10 +28,9 @@ This plugin can be used with these payment gateways:
 * iDEAL
 * P24
 * SEPA Direct Debit
-* Sofort
 * UPI
-* NetBanking
 * Klarna
+* New Zealand BECS Direct Debit
 
 Some of those payment gateways will only work in Stripe if you have provided additional verification details.
 
