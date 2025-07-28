@@ -449,7 +449,7 @@ class stripe_helper {
         string $paymentarea,
         string $itemid
     ): ?string {
-        global $CFG, $USER, $DB;
+        global $CFG, $USER;
 
         // Ensure webhook exists before we use it.
         $this->create_webhook($payable->get_account_id());
