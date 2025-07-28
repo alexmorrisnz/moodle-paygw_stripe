@@ -72,6 +72,7 @@ $string['updatepaymentmethod'] = 'Update Payment Method';
 $string['cancel'] = 'Cancel';
 $string['subscriptionssubheading'] =
     'This page lists the subscriptions you have purchased. You can cancel subscriptions here, cancellations will be processed immediately and you will not be able to enter the course again.';
+$string['alreadydeliveredcourse'] = 'This course is already delivered to you, if you believe there has been an error contact your site administrator.';
 
 $string['customsubscriptioninterval:day'] = 'Day';
 $string['customsubscriptioninterval:week'] = 'Week';

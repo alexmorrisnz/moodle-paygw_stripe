@@ -598,6 +598,22 @@ class stripe_helper {
     }
 
     /**
+     * Check if a checkout session has been saved in the DB.
+     *
+     * @param string $sessionid
+     * @return bool
+     * @throws \dml_exception
+     */
+    public function is_checkout_session_saved(string $sessionid): bool {
+        global $DB;
+
+        if ($DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $sessionid])) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Saves the payment status
      *
      * @param string $sessionid
