@@ -193,6 +193,7 @@ class gateway extends \core_payment\gateway {
                 $helper = new stripe_helper($data->apikey, $data->secretkey);
                 $helper->create_webhook($paymentaccountid);
             } catch (Exception $ignored) {
+                // Ignore errors, API keys given could be wrong.
             }
         }
     }
