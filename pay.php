@@ -44,27 +44,43 @@ $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 if (!isset($config->type) || $config->type == 'onetime') {
-    $sessionid = $stripehelper->generate_payment($config, $payable, $description, $cost, $component,
-        $paymentarea, $itemid);
+    $sessionid = $stripehelper->generate_payment(
+        $config,
+        $payable,
+        $description,
+        $cost,
+        $component,
+        $paymentarea,
+        $itemid
+    );
 } else {
-    $sessionid = $stripehelper->generate_subscription($config, $payable, $description, $cost, $component,
-        $paymentarea, $itemid, $sessionid);
+    $sessionid = $stripehelper->generate_subscription(
+        $config,
+        $payable,
+        $description,
+        $cost,
+        $component,
+        $paymentarea,
+        $itemid,
+        $sessionid
+    );
     if ($sessionid == null) {
         redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));
     }
 }
 
+// phpcs:disable
 ?>
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Stripe Checkout Redirect</title>
-    <script src="https://js.stripe.com/v3/"></script>
-    <script>
-        const stripe = Stripe("<?php echo $config->apikey ?>");
-        stripe.redirectToCheckout({sessionId: "<?php echo $sessionid; ?>"});
-    </script>
-</head>
-<body>
-</body>
+    <head>
+        <title>Stripe Checkout Redirect</title>
+        <script src="https://js.stripe.com/v3/"></script>
+        <script>
+            const stripe = Stripe("<?php echo $config->apikey ?>");
+            stripe.redirectToCheckout({sessionId: "<?php echo $sessionid; ?>"});
+        </script>
+    </head>
+    <body>
+    </body>
 </html>

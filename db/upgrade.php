@@ -139,20 +139,23 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
                 'message_provider_paygw_stripe_payment_successful_loggedin',
                 'message_provider_paygw_stripe_payment_successful_loggedoff',
                 'message_provider_paygw_stripe_payment_failed_loggedin',
-                'message_provider_paygw_stripe_payment_failed_loggedoff'
+                'message_provider_paygw_stripe_payment_failed_loggedoff',
             ];
 
             foreach ($names as $name) {
                 $record = [
                     'plugin' => 'message',
                     'name' => $name,
-                    'value' => 'email,popup'
+                    'value' => 'email,popup',
                 ];
-                if (!$DB->record_exists_select('config_plugins',
-                    'plugin = :plugin AND name = :name AND ' . $DB->sql_compare_text('value') . ' = ' .
-                    $DB->sql_compare_text(':value'),
-                    $record
-                )) {
+                if (
+                    !$DB->record_exists_select(
+                        'config_plugins',
+                        'plugin = :plugin AND name = :name AND ' . $DB->sql_compare_text('value') . ' = ' .
+                        $DB->sql_compare_text(':value'),
+                        $record
+                    )
+                ) {
                     $DB->insert_record('config_plugins', $record);
                 }
             }
@@ -232,8 +235,10 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         // Rename table to better reflect usage, add session ID and make payment_intent nullable.
         $table = new xmldb_table('paygw_stripe_intents');
 
-        $dbman->add_field($table,
-            new xmldb_field('checkoutsessionid', XMLDB_TYPE_CHAR, '100', null, null, null, null));
+        $dbman->add_field(
+            $table,
+            new xmldb_field('checkoutsessionid', XMLDB_TYPE_CHAR, '100', null, null, null, null)
+        );
         $dbman->add_index($table, new xmldb_index('checkoutsessionid', XMLDB_INDEX_UNIQUE, ['checkoutsessionid']));
 
         $intentindex = new xmldb_index('paymentintent', XMLDB_INDEX_UNIQUE, ['paymentintent']);

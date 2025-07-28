@@ -38,8 +38,16 @@ function paygw_stripe_myprofile_navigation(\core_user\output\myprofile\tree $tre
         return;
     }
 
-    $tree->add_category(new core_user\output\myprofile\category('paygw_stripe', get_string('profilecat', 'paygw_stripe'),
-        'loginactivity'));
-    $tree->add_node(new core_user\output\myprofile\node('paygw_stripe', 'cancelsubscriptions',
-        get_string('cancelsubscriptions', 'paygw_stripe'), null, new moodle_url('/payment/gateway/stripe/subscriptions.php')));
+    $tree->add_category(new core_user\output\myprofile\category(
+        'paygw_stripe',
+        get_string('profilecat', 'paygw_stripe'),
+        'loginactivity'
+    ));
+    $tree->add_node(new core_user\output\myprofile\node(
+        'paygw_stripe',
+        'cancelsubscriptions',
+        get_string('cancelsubscriptions', 'paygw_stripe'),
+        null,
+        new moodle_url('/payment/gateway/stripe/subscriptions.php')
+    ));
 }
