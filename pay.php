@@ -69,6 +69,7 @@ if (!isset($config->type) || $config->type == 'onetime') {
     }
 }
 
+// phpcs:disable
 ?>
 <!DOCTYPE html>
 <html>

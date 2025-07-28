@@ -187,8 +187,8 @@ class stripe_helper {
         string $productid,
         float $unitamount,
         bool $automatictax,
-        string $defaultbehavior = null,
-        array $recurring = null
+        ?string $defaultbehavior = null,
+        ?array $recurring = null
     ) {
         $pricedata = [
             'currency' => $currency,
@@ -272,7 +272,7 @@ class stripe_helper {
         string $component,
         string $paymentarea,
         string $itemid,
-        array $subscription = null
+        ?array $subscription = null
     ) {
         $unitamount = $this->get_unit_amount($cost, $payable->get_currency());
         $currency = strtolower($payable->get_currency());
