@@ -399,8 +399,17 @@ class stripe_helper {
             $customer = $this->create_customer($USER);
         }
 
-        // If anchored billing and/or trial period are enabled, set up the subscriptiondata parameter.
-        $subscriptiondata = [];
+        $subscriptiondata = [
+            'metadata' => [
+                'userid' => $USER->id,
+                'username' => $USER->username,
+                'firstname' => $USER->firstname,
+                'lastname' => $USER->lastname,
+                'component' => $component,
+                'paymentarea' => $paymentarea,
+                'itemid' => $itemid
+            ]
+        ];
         if ($config->anchorbilling) {
             $subscriptiondata['billing_cycle_anchor'] = $this->get_anchor_billing_dates($config)->getTimestamp();
             if ($config->firstintervalfree) {
