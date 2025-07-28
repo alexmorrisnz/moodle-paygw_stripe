@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="payment/gateway/stripe/db" VERSION="20230330" COMMENT="XMLDB file for Stripe payment gateway plugin"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
+<XMLDB PATH="payment/gateway/stripe/db" VERSION="20250728" COMMENT="XMLDB file for Stripe payment gateway plugin"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
     <TABLE NAME="paygw_stripe_products" COMMENT="Stores Stripe product info">
@@ -27,11 +27,12 @@
         <KEY NAME="userid" TYPE="foreign-unique" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
     </TABLE>
-    <TABLE NAME="paygw_stripe_intents" COMMENT="Stores payment intent IDs to track transaction status.">
+    <TABLE NAME="paygw_stripe_checkout_sessions" COMMENT="Stores checkout session IDs to track transaction status.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
-        <FIELD NAME="paymentintent" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="checkoutsessionid" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="paymentintent" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="customerid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe customer ID"/>
         <FIELD NAME="amounttotal" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="paymentstatus" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Session payment status"/>
@@ -42,7 +43,7 @@
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="paymentintent" UNIQUE="true" FIELDS="paymentintent"/>
+        <INDEX NAME="checkoutsessionid" UNIQUE="true" FIELDS="checkoutsessionid"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="paygw_stripe_webhooks" COMMENT="Stores webhook secrets.">

@@ -25,6 +25,7 @@
 namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
+use Exception;
 
 /**
  * The gateway class for Stripe payment gateway.
@@ -95,11 +96,10 @@ class gateway extends \core_payment\gateway {
             'ideal' => get_string('paymentmethod:ideal', 'paygw_stripe'),
             'p24' => get_string('paymentmethod:p24', 'paygw_stripe'),
             'sepa_debit' => get_string('paymentmethod:sepa_debit', 'paygw_stripe'),
-            'sofort' => get_string('paymentmethod:sofort', 'paygw_stripe'),
             'upi' => get_string('paymentmethod:upi', 'paygw_stripe'),
-            'netbanking' => get_string('paymentmethod:netbanking', 'paygw_stripe'),
             'wechat_pay' => get_string('paymentmethod:wechat_pay', 'paygw_stripe'),
-            'klarna' => get_string('paymentmethod:klarna', 'paygw_stripe')
+            'klarna' => get_string('paymentmethod:klarna', 'paygw_stripe'),
+            'nz_bank_account' => get_string('paymentmethod:nz_bank_account', 'paygw_stripe')
         ];
         $method = $mform->addElement('select', 'paymentmethods', get_string('paymentmethods', 'paygw_stripe'), $paymentmethods);
         $mform->setType('paymentmethods', PARAM_TEXT);
@@ -176,8 +176,27 @@ class gateway extends \core_payment\gateway {
      */
     public static function validate_gateway_form(account_gateway $form,
         \stdClass $data, array $files, array &$errors): void {
+        global $DB;
         if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
+        }
+
+        // Very hacky as this shouldn't live in a validation function, but due to Moodle limitations it's placed here.
+        // Check if API keys have changed, remove existing webhook and create new.
+        $existingdata = $form->get_gateway_persistent()->get_configuration();
+        if ($data->apikey != $existingdata['apikey'] || $data->secretkey != $existingdata['secretkey']) {
+            $paymentaccountid = $form->get_gateway_persistent()->get_account()->get('id');
+
+            $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]);
+            try {
+                $oldhelper = new stripe_helper($existingdata['apikey'], $existingdata['secretkey']);
+                $oldhelper->delete_webhook($paymentaccountid);
+
+                $newhelper = new stripe_helper($data->apikey, $data->secretkey);
+                $newhelper->create_webhook($paymentaccountid);
+            } catch (Exception $ignored) {
+                $errors['apikey'] = get_string('apiwebhookerror', 'paygw_stripe');
+            }
         }
     }
 }
