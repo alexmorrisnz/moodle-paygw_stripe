@@ -683,6 +683,28 @@ class stripe_helper {
     }
 
     /**
+     * Delete a webhook record in the database and it's associated Stripe endpoint.
+     *
+     * @param int $paymentaccountid
+     * @return bool
+     * @throws ApiErrorException
+     * @throws \dml_exception
+     */
+    public function delete_webhook(int $paymentaccountid): bool {
+        global $DB;
+
+        if (!($record = $DB->get_record('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]))) {
+            return false;
+        }
+
+        $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $record->paymentaccountid]);
+
+        $this->stripe->webhookEndpoints->delete($record->webhookid);
+
+        return true;
+    }
+
+    /**
      * Process stripe payment events
      *
      * @param Event $event

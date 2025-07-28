@@ -29,6 +29,7 @@ $string['apikey'] = 'API Key';
 $string['apikey_help'] = 'The API key that we use to identifier ourselves with Stripe';
 $string['secretkey'] = 'Secret Key';
 $string['secretkey_help'] = 'Secret key to authenticate with Stripe';
+$string['apiwebhookerror'] = 'There was an error while creating a webhook using the given API keys.';
 $string['paymentmethods'] = 'Payment Methods';
 $string['allowpromotioncodes'] = 'Allow Promotion Codes';
 $string['gatewaydescription'] = 'Stripe is an authorised payment gateway provider for processing credit card transactions.';
