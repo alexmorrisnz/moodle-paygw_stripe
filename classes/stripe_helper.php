@@ -337,6 +337,16 @@ class stripe_helper {
             'automatic_tax' => [
                 'enabled' => $config->enableautomatictax == 1,
             ],
+            'billing_address_collection' => $config->collectbillingaddress == 1 ? 'required' : 'auto',
+            'invoice_creation' => [
+                'enabled' => $config->invoicecreation == 1,
+                'invoice_data' => [
+                    'issuer' => [
+                        'type' => 'self',
+                    ],
+                    'description' => $description,
+                ],
+            ],
             'customer' => $customer->id,
             'metadata' => [
                 'userid' => $USER->id,
@@ -435,6 +445,7 @@ class stripe_helper {
             'automatic_tax' => [
                 'enabled' => $config->enableautomatictax == 1,
             ],
+            'billing_address_collection' => $config->collectbillingaddress == 1 ? 'required' : 'auto',
             'allow_promotion_codes' => $config->allowpromotioncodes == 1,
             'subscription_data' => $subscriptiondata,
             'customer' => $customer->id,

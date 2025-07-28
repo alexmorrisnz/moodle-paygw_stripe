@@ -118,12 +118,21 @@ class gateway extends \core_payment\gateway {
         ]);
         $mform->addHelpButton('defaulttaxbehavior', 'defaulttaxbehavior', 'paygw_stripe');
 
+        $mform->addElement('advcheckbox', 'collectbillingaddress', get_string('collectbillingaddress', 'paygw_stripe'),
+            get_string('collectbillingaddress_desc', 'paygw_stripe'));
+        $mform->setDefault('collectbillingaddress', false);
+
         $mform->addElement('select', 'type', get_string('paymenttype', 'paygw_stripe'), [
             'onetime' => get_string('paymenttype:onetime', 'paygw_stripe'),
             'subscription' => get_string('paymenttype:subscription', 'paygw_stripe'),
         ]);
         $mform->setType('type', PARAM_TEXT);
         $mform->setDefault('type', 'onetime');
+
+        $mform->addElement('advcheckbox', 'invoicecreation', get_string('invoicecreation', 'paygw_stripe'),
+            get_string('invoicecreation_desc', 'paygw_stripe'));
+        $mform->setDefault('invoicecreation', false);
+        $mform->hideIf('invoicecreation', 'type', 'neq', 'onetime');
 
         $mform->addElement('select', 'subscriptioninterval', get_string('subscriptioninterval', 'paygw_stripe'), [
             'daily' => get_string('subscriptionperiod:daily', 'paygw_stripe'),
