@@ -59,7 +59,9 @@ $endpointsecret = $webhook->secret;
 
 try {
     $event = Webhook::constructEvent(
-        $payload, $sigheader, $endpointsecret
+        $payload,
+        $sigheader,
+        $endpointsecret
     );
 
     if (!$stripehelper->process_stripe_event($event, $metadata)) {

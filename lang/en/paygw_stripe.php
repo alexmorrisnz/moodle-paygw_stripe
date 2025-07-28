@@ -22,115 +22,118 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['pluginname'] = 'Stripe';
-$string['pluginname_desc'] = 'The Stripe plugin allows you to receive payments via Stripe.';
-$string['gatewayname'] = 'Stripe';
-$string['apikey'] = 'API Key';
-$string['apikey_help'] = 'The API key that we use to identifier ourselves with Stripe';
-$string['secretkey'] = 'Secret Key';
-$string['secretkey_help'] = 'Secret key to authenticate with Stripe';
-$string['apiwebhookerror'] = 'There was an error while creating a webhook using the given API keys.';
-$string['paymentmethods'] = 'Payment Methods';
 $string['allowpromotioncodes'] = 'Allow Promotion Codes';
-$string['gatewaydescription'] = 'Stripe is an authorised payment gateway provider for processing credit card transactions.';
-$string['stripeaccount'] = 'Stripe account ID';
-$string['stripeaccount_help'] = 'For creating the direct charge branding page';
-$string['paymentsuccessful'] = 'Payment was successful';
-$string['paymentcancelled'] = 'Payment was cancelled';
-$string['paymentpending'] = 'Payment is pending, you will be enrolled when the payment has cleared.';
-$string['customerdescription'] = 'Moodle User ID: {$a}';
-$string['enableautomatictax'] = 'Enable automatic tax';
-$string['enableautomatictax_desc'] = 'Automatic tax must be enabled and configured in the Stripe dashboard.';
-$string['defaulttaxbehavior'] = 'Default tax behavior';
-$string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclusive). Changeable in Stripe dashboard.';
-$string['profilecat'] = 'Stripe Payment Subscriptions';
-$string['cancelsubscriptions'] = 'Change Subscriptions';
-$string['subscriptions'] = 'Subscriptions';
-$string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
-$string['paymenttype'] = 'Payment Type';
-$string['paymenttype:onetime'] = 'One Time';
-$string['paymenttype:subscription'] = 'Subscription';
-$string['subscriptioninterval'] = 'Subscription Period';
-$string['customsubscriptioninterval'] = 'Custom Subscription Period';
-$string['customsubscriptionintervalcount'] = 'Custom Subscription Period Interval';
-$string['customsubscriptionintervalcount_help'] = '';
+$string['alreadydeliveredcourse'] = 'This course is already delivered to you, if you believe there has been an error contact your site administrator.';
 $string['anchoredbilling'] = 'Use the start of the subscription interval as a fixed billing date.';
 $string['anchoredbilling_help'] =
     'E.g. For a monthly subscription, billing will be done every 1st of the month. If a user subscribes in the middle of the month, they will be charged a prorated amount covering from the registration day to the end of the month';
-$string['trialperiod'] = 'Trial Period';
-$string['trialperiod_help'] = 'E.g. the first interval is free. If the subscription is created on the 24th April, a month is free and billing starts on the 24th May.<br/>
-    If billing happens at the start of the interval (e.g. on the 1st of the month), the pro-rated amount is waved. If a user registers on the 24th April, April is free and billing starts on the 1st May';
-$string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
-$string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
+$string['apikey'] = 'API Key';
+$string['apikey_help'] = 'The API key that we use to identifier ourselves with Stripe';
+$string['apiwebhookerror'] = 'There was an error while creating a webhook using the given API keys.';
+$string['cancel'] = 'Cancel';
 $string['cancelsubscription'] = 'Cancel subscription';
 $string['cancelsubscriptionconfirm'] = 'Are you sure you wish to cancel this subscription?';
-$string['product'] = 'Product';
-$string['fee'] = 'Fee';
-$string['scheduledrenewal'] = 'Scheduled Renewal';
-$string['status'] = 'Status';
-$string['updatepaymentmethod'] = 'Update Payment Method';
-$string['cancel'] = 'Cancel';
-$string['subscriptionssubheading'] =
-    'This page lists the subscriptions you have purchased. You can cancel subscriptions here, cancellations will be processed immediately and you will not be able to enter the course again.';
-$string['alreadydeliveredcourse'] = 'This course is already delivered to you, if you believe there has been an error contact your site administrator.';
+$string['cancelsubscriptions'] = 'Change Subscriptions';
 $string['collectbillingaddress'] = 'Collect billing address';
 $string['collectbillingaddress_desc'] = 'Require billing address in checkout';
+$string['customerdescription'] = 'Moodle User ID: {$a}';
+$string['customsubscriptioninterval'] = 'Custom Subscription Period';
+$string['customsubscriptioninterval:day'] = 'Day';
+$string['customsubscriptioninterval:month'] = 'Month';
+$string['customsubscriptioninterval:week'] = 'Week';
+$string['customsubscriptioninterval:year'] = 'Year';
+$string['customsubscriptionintervalcount'] = 'Custom Subscription Period Interval';
+$string['customsubscriptionintervalcount_help'] = '';
+$string['defaulttaxbehavior'] = 'Default tax behavior';
+$string['defaulttaxbehavior_help'] = 'Default behavior of tax (inclusive, exclusive). Changeable in Stripe dashboard.';
+$string['enableautomatictax'] = 'Enable automatic tax';
+$string['enableautomatictax_desc'] = 'Automatic tax must be enabled and configured in the Stripe dashboard.';
+$string['failedtosetdefaultpaymentmethod'] = 'Failed to set up a payment method for subscription, please try again.';
+$string['fee'] = 'Fee';
+$string['gatewaydescription'] = 'Stripe is an authorised payment gateway provider for processing credit card transactions.';
+$string['gatewayname'] = 'Stripe';
 $string['invoicecreation'] = 'Automatic Invoices';
 $string['invoicecreation_desc'] = 'Generate post-purchase invoice for one-time payments';
 
-$string['customsubscriptioninterval:day'] = 'Day';
-$string['customsubscriptioninterval:week'] = 'Week';
-$string['customsubscriptioninterval:month'] = 'Month';
-$string['customsubscriptioninterval:year'] = 'Year';
-
-$string['subscriptionperiod:daily'] = 'Daily';
-$string['subscriptionperiod:weekly'] = 'Weekly';
-$string['subscriptionperiod:monthly'] = 'Monthly';
-$string['subscriptionperiod:every3months'] = 'Every 3 Months';
-$string['subscriptionperiod:every6months'] = 'Every 6 Months';
-$string['subscriptionperiod:yearly'] = 'Yearly';
-$string['subscriptionperiod:custom'] = 'Custom';
-
-$string['subscriptionstatus:active'] = 'Active';
-$string['subscriptionstatus:past_due'] = 'Payment Past Due';
-$string['subscriptionstatus:unpaid'] = 'Unpaid';
-$string['subscriptionstatus:canceled'] = 'Cancelled';
-$string['subscriptionstatus:incomplete'] = 'Incomplete';
-$string['subscriptionstatus:incomplete_expired'] = 'Expired';
-$string['subscriptionstatus:trialing'] = 'Trialing';
-$string['subscriptionstatus:paused'] = 'Paused';
-
-$string['payment:successful:subject'] = 'Payment successful';
-$string['payment:successful:message'] = 'Your payment was successful, you can now visit {$a->url}';
-$string['payment:failed:subject'] = 'Payment failed';
-$string['payment:failed:message'] = 'Your payment failed to clear, please check your payment details and try again.';
-
-$string['messageprovider:payment_successful'] = 'Successful delayed payment confirmation notification';
 $string['messageprovider:payment_failed'] = 'Failed delayed payment notification';
+$string['messageprovider:payment_successful'] = 'Successful delayed payment confirmation notification';
 
-$string['taxbehavior:exclusive'] = 'Exclusive';
-$string['taxbehavior:inclusive'] = 'Inclusive';
+$string['payment:failed:message'] = 'Your payment failed to clear, please check your payment details and try again.';
+$string['payment:failed:subject'] = 'Payment failed';
+$string['payment:successful:message'] = 'Your payment was successful, you can now visit {$a->url}';
+$string['payment:successful:subject'] = 'Payment successful';
 
-$string['paymentmethod:card'] = 'Card';
+$string['paymentcancelled'] = 'Payment was cancelled';
+
 $string['paymentmethod:alipay'] = 'Alipay';
 $string['paymentmethod:bancontact'] = 'Bancontact';
+$string['paymentmethod:card'] = 'Card';
 $string['paymentmethod:eps'] = 'EPS';
 $string['paymentmethod:giropay'] = 'giropay';
 $string['paymentmethod:ideal'] = 'iDEAL';
+$string['paymentmethod:klarna'] = 'Klarna';
+$string['paymentmethod:nz_bank_account'] = 'NZ BECS Direct Debit';
 $string['paymentmethod:p24'] = 'P24';
 $string['paymentmethod:sepa_debit'] = 'SEPA Direct Debit';
 $string['paymentmethod:upi'] = 'UPI';
 $string['paymentmethod:wechat_pay'] = 'WeChat Pay';
-$string['paymentmethod:klarna'] = 'Klarna';
-$string['paymentmethod:nz_bank_account'] = 'NZ BECS Direct Debit';
+
+$string['paymentmethods'] = 'Payment Methods';
+$string['paymentpending'] = 'Payment is pending, you will be enrolled when the payment has cleared.';
+$string['paymentsuccessful'] = 'Payment was successful';
+$string['paymenttype'] = 'Payment Type';
+$string['paymenttype:onetime'] = 'One Time';
+$string['paymenttype:subscription'] = 'Subscription';
+$string['pluginname'] = 'Stripe';
+$string['pluginname_desc'] = 'The Stripe plugin allows you to receive payments via Stripe.';
 
 $string['privacy:metadata:stripe_customers'] = 'Stores the relation from Moodle users to Stripe customer objects';
-$string['privacy:metadata:stripe_customers:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_customers:customerid'] = 'Customer ID returned from Stripe';
-
+$string['privacy:metadata:stripe_customers:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_intents'] = 'Stores payment intent data to track payment history';
 $string['privacy:metadata:stripe_intents:userid'] = 'Moodle user ID';
-
 $string['privacy:metadata:stripe_subscriptions'] =
     'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
 $string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
+
+$string['product'] = 'Product';
+$string['profilecat'] = 'Stripe Payment Subscriptions';
+$string['scheduledrenewal'] = 'Scheduled Renewal';
+$string['secretkey'] = 'Secret Key';
+$string['secretkey_help'] = 'Secret key to authenticate with Stripe';
+$string['status'] = 'Status';
+$string['stripeaccount'] = 'Stripe account ID';
+$string['stripeaccount_help'] = 'For creating the direct charge branding page';
+$string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
+$string['subscriptioninterval'] = 'Subscription Period';
+
+$string['subscriptionperiod:custom'] = 'Custom';
+$string['subscriptionperiod:daily'] = 'Daily';
+$string['subscriptionperiod:every3months'] = 'Every 3 Months';
+$string['subscriptionperiod:every6months'] = 'Every 6 Months';
+$string['subscriptionperiod:monthly'] = 'Monthly';
+$string['subscriptionperiod:weekly'] = 'Weekly';
+$string['subscriptionperiod:yearly'] = 'Yearly';
+
+$string['subscriptions'] = 'Subscriptions';
+$string['subscriptionssubheading'] =
+    'This page lists the subscriptions you have purchased. You can cancel subscriptions here, cancellations will be processed immediately and you will not be able to enter the course again.';
+
+$string['subscriptionstatus:active'] = 'Active';
+$string['subscriptionstatus:canceled'] = 'Cancelled';
+$string['subscriptionstatus:incomplete'] = 'Incomplete';
+$string['subscriptionstatus:incomplete_expired'] = 'Expired';
+$string['subscriptionstatus:past_due'] = 'Payment Past Due';
+$string['subscriptionstatus:paused'] = 'Paused';
+$string['subscriptionstatus:trialing'] = 'Trialing';
+$string['subscriptionstatus:unpaid'] = 'Unpaid';
+
+$string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
+
+$string['taxbehavior:exclusive'] = 'Exclusive';
+$string['taxbehavior:inclusive'] = 'Inclusive';
+
+$string['trialperiod'] = 'Trial Period';
+$string['trialperiod_help'] = 'E.g. the first interval is free. If the subscription is created on the 24th April, a month is free and billing starts on the 24th May.<br/>
+    If billing happens at the start of the interval (e.g. on the 1st of the month), the pro-rated amount is waved. If a user registers on the 24th April, April is free and billing starts on the 1st May';
+$string['updatepaymentmethod'] = 'Update Payment Method';
