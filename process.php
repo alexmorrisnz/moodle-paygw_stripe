@@ -40,13 +40,12 @@ $config = (object) helper::get_gateway_configuration($component, $paymentarea, $
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
-$stripehelper->save_payment_status($sessionid);
-
 $sessionmode = $stripehelper->get_sessionmode($sessionid);
 
 if ($sessionmode === 'subscription') {
     $subscriptionstatus = $stripehelper->get_subscription_status($sessionid);
     if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
+        $stripehelper->save_payment_status($sessionid);
         $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
 
         // Find redirection.
@@ -57,6 +56,12 @@ if ($sessionmode === 'subscription') {
     }
 } else if ($sessionmode === 'payment') {
     if ($stripehelper->is_paid($sessionid)) {
+        if ($stripehelper->is_checkout_session_saved($sessionid)) {
+            // User is attempting to replay course delivery, redirect away.
+            redirect(new moodle_url('/'), get_string('alreadydeliveredcourse', 'paygw_stripe'));
+        }
+
+        $stripehelper->save_payment_status($sessionid);
         $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
 
         // Find redirection.
