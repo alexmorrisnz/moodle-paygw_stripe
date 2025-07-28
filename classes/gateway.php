@@ -25,6 +25,7 @@
 namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
+use Exception;
 
 /**
  * The gateway class for Stripe payment gateway.
@@ -175,8 +176,24 @@ class gateway extends \core_payment\gateway {
      */
     public static function validate_gateway_form(account_gateway $form,
         \stdClass $data, array $files, array &$errors): void {
+        global $DB;
         if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
+        }
+
+        // Very hacky as this shouldn't live in a validation function, but due to Moodle limitations it's placed here.
+        // Check if API keys have changed, remove existing webhook from DB and create new.
+        $existingdata = $form->get_gateway_persistent()->get_configuration();
+        if ($data->apikey != $existingdata['apikey'] || $data->secretkey != $existingdata['secretkey']) {
+            $paymentaccountid = $form->get_gateway_persistent()->get_account()->get('id');
+
+            $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]);
+
+            try {
+                $helper = new stripe_helper($data->apikey, $data->secretkey);
+                $helper->create_webhook($paymentaccountid);
+            } catch (Exception $ignored) {
+            }
         }
     }
 }
