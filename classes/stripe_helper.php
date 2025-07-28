@@ -64,7 +64,7 @@ class stripe_helper {
     /**
      * @var string Stripe API version set explicitly in Stripe client.
      */
-    public static $apiversion = '2023-08-16';
+    public static $apiversion = '2025-06-30.basil';
 
     /**
      * Initialise the Stripe API client.
