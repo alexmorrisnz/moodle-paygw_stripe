@@ -50,11 +50,11 @@ class provider implements \core_privacy\local\request\data_provider, \core_priva
         );
 
         $collection->add_database_table(
-            'paygw_stripe_intents',
+            'paygw_stripe_checkout_sessions',
             [
-                'userid' => 'privacy:metadata:stripe_intents:userid',
+                'userid' => 'privacy:metadata:stripe_checkout_sessions:userid',
             ],
-            'privacy:metadata:stripe_intents'
+            'privacy:metadata:stripe_checkout_sessions'
         );
 
         $collection->add_database_table(

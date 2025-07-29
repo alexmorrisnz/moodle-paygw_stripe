@@ -87,11 +87,11 @@ $string['paymenttype:subscription'] = 'Subscription';
 $string['pluginname'] = 'Stripe';
 $string['pluginname_desc'] = 'The Stripe plugin allows you to receive payments via Stripe.';
 
+$string['privacy:metadata:stripe_checkout_sessions'] = 'Stores payment checkout data to track payment history';
+$string['privacy:metadata:stripe_checkout_sessions:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_customers'] = 'Stores the relation from Moodle users to Stripe customer objects';
 $string['privacy:metadata:stripe_customers:customerid'] = 'Customer ID returned from Stripe';
 $string['privacy:metadata:stripe_customers:userid'] = 'Moodle user ID';
-$string['privacy:metadata:stripe_intents'] = 'Stores payment intent data to track payment history';
-$string['privacy:metadata:stripe_intents:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_subscriptions'] =
     'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
 $string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
