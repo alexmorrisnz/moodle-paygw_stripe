@@ -19,5 +19,27 @@ class AccountLink extends ApiResource
 {
     const OBJECT_NAME = 'account_link';
 
-    use ApiOperations\Create;
+    /**
+     * Creates an AccountLink object that includes a single-use Stripe URL that the
+     * platform can redirect their user to in order to take them through the Connect
+     * Onboarding flow.
+     *
+     * @param null|array{account: string, collect?: string, collection_options?: array{fields?: string, future_requirements?: string}, expand?: string[], refresh_url?: string, return_url?: string, type: string} $params
+     * @param null|array|string $options
+     *
+     * @return AccountLink the created resource
+     *
+     * @throws Exception\ApiErrorException if the request fails
+     */
+    public static function create($params = null, $options = null)
+    {
+        self::_validateParams($params);
+        $url = static::classUrl();
+
+        list($response, $opts) = static::_staticRequest('post', $url, $params, $options);
+        $obj = Util\Util::convertToStripeObject($response->json, $opts);
+        $obj->setLastResponse($response);
+
+        return $obj;
+    }
 }

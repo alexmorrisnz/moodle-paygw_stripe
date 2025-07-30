@@ -64,7 +64,7 @@ class stripe_helper {
     /**
      * @var string Stripe API version set explicitly in Stripe client.
      */
-    public static $apiversion = '2023-08-16';
+    public static $apiversion = '2025-06-30.basil';
 
     /**
      * Initialise the Stripe API client.
@@ -934,7 +934,7 @@ class stripe_helper {
                 $product->name,
                 $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' .
                 get_string('customsubscriptioninterval:' . $price->recurring->interval, 'paygw_stripe'),
-                userdate($subscription->current_period_end),
+                userdate($subscription->items->data[0]->current_period_end),
                 get_string('subscriptionstatus:' . $moodlesub->status, 'paygw_stripe'),
                 $moodlesub->status != 'canceled' ?
                     \html_writer::link($portallink, get_string('updatepaymentmethod', 'paygw_stripe')) : '',
