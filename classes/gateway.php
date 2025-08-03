@@ -225,8 +225,10 @@ class gateway extends \core_payment\gateway {
 
             $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]);
             try {
-                $oldhelper = new stripe_helper($existingdata['apikey'], $existingdata['secretkey']);
-                $oldhelper->delete_webhook($paymentaccountid);
+                if (is_string($existingdata['apikey']) && is_string($existingdata['secretkey'])) {
+                    $oldhelper = new stripe_helper($existingdata['apikey'], $existingdata['secretkey']);
+                    $oldhelper->delete_webhook($paymentaccountid);
+                }
 
                 $newhelper = new stripe_helper($data->apikey, $data->secretkey);
                 $newhelper->create_webhook($paymentaccountid);
