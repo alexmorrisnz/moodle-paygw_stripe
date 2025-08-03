@@ -104,3 +104,34 @@ function paygw_stripe_delete_webhooks() {
         }
     }
 }
+
+/**
+ * Recreate webhooks for API upgrades.
+ *
+ * @return void
+ * @throws coding_exception
+ * @throws dml_exception
+ */
+function paygw_stripe_recreate_webhooks() {
+    global $DB;
+
+    $gateways = $DB->get_records('payment_gateways', ['gateway' => 'stripe']);
+    foreach ($gateways as $gatewayrecord) {
+        $account = new account($gatewayrecord->accountid);
+        $gateway = $account->get_gateways(false)['stripe'] ?? null;
+        if ($gateway != null) {
+            $config = $gateway->get_configuration();
+            if (!is_string($config['apikey']) || !is_string($config['secretkey'])) {
+                continue;
+            }
+            try {
+                $stripehelper = new stripe_helper($config['apikey'], $config['secretkey']);
+                $stripehelper->delete_webhook($account->get('id'));
+                $stripehelper->create_webhook($account->get('id'));
+            } catch (Exception $ignored) {
+                // Ignore errors, the api keys we are given may be wrong.
+                continue;
+            }
+        }
+    }
+}

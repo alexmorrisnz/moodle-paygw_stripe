@@ -254,5 +254,11 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2025072800, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2025080300) {
+        // API version upgrade in last update, but I forgot to recreate webhooks.
+        paygw_stripe_recreate_webhooks();
+        upgrade_plugin_savepoint(true, 2025080300, 'paygw', 'stripe');
+    }
+
     return true;
 }
