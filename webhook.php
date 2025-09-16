@@ -44,9 +44,11 @@ if (!isset($jsonpayload['data']['object']['metadata'])) {
     http_response_code(202);
     exit();
 }
-if (!isset($jsonpayload['data']['object']['metadata']['component']) ||
+if (
+    !isset($jsonpayload['data']['object']['metadata']['component']) ||
     !isset($jsonpayload['data']['object']['metadata']['paymentarea']) ||
-    !isset($jsonpayload['data']['object']['metadata']['itemid'])) {
+    !isset($jsonpayload['data']['object']['metadata']['itemid'])
+) {
     http_response_code(202);
     exit();
 }
