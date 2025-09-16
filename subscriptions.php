@@ -76,6 +76,10 @@ $table->data = [];
 
 foreach ($subscriptions as $subscription) {
     $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
+    // Switching API keys can lead to products in the Moodle DB not matching what exists in Stripe, ignore and move on.
+    if ($product == null) {
+        continue;
+    }
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');
     $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
     $row = $stripehelper->get_subscription_table_data($subscription);

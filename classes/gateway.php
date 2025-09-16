@@ -100,6 +100,7 @@ class gateway extends \core_payment\gateway {
             'wechat_pay' => get_string('paymentmethod:wechat_pay', 'paygw_stripe'),
             'klarna' => get_string('paymentmethod:klarna', 'paygw_stripe'),
             'nz_bank_account' => get_string('paymentmethod:nz_bank_account', 'paygw_stripe'),
+            'twint' => get_string('paymentmethod:twint', 'paygw_stripe'),
         ];
         $method = $mform->addElement('select', 'paymentmethods', get_string('paymentmethods', 'paygw_stripe'), $paymentmethods);
         $mform->setType('paymentmethods', PARAM_TEXT);

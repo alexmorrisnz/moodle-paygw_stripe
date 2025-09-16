@@ -75,6 +75,7 @@ $string['paymentmethod:klarna'] = 'Klarna';
 $string['paymentmethod:nz_bank_account'] = 'NZ BECS Direct Debit';
 $string['paymentmethod:p24'] = 'P24';
 $string['paymentmethod:sepa_debit'] = 'SEPA Direct Debit';
+$string['paymentmethod:twint'] = 'TWINT';
 $string['paymentmethod:upi'] = 'UPI';
 $string['paymentmethod:wechat_pay'] = 'WeChat Pay';
 
