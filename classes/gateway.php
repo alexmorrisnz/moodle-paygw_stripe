@@ -221,20 +221,28 @@ class gateway extends \core_payment\gateway {
         // Very hacky as this shouldn't live in a validation function, but due to Moodle limitations it's placed here.
         // Check if API keys have changed, remove existing webhook and create new.
         $existingdata = $form->get_gateway_persistent()->get_configuration();
-        if (
-            isset($existingdata['apikey']) && isset($existingdata['secretkey']) &&
-            ($data->apikey != $existingdata['apikey'] || $data->secretkey != $existingdata['secretkey'])
-        ) {
+
+        $newapikey = $data->apikey ?? null;
+        $newsecret = $data->secretkey ?? null;
+
+        $oldapikey = $existingdata['apikey'] ?? null;
+        $oldsecret = $existingdata['secretkey'] ?? null;
+
+        $apikeychanged = ($newapikey !== null) && ($newapikey !== $oldapikey);
+        $secretchanged = ($newsecret !== null) && ($newsecret !== $oldsecret);
+
+        if ($apikeychanged || $secretchanged) {
             $paymentaccountid = $form->get_gateway_persistent()->get_account()->get('id');
 
             $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]);
+
             try {
-                if (is_string($existingdata['apikey']) && is_string($existingdata['secretkey'])) {
-                    $oldhelper = new stripe_helper($existingdata['apikey'], $existingdata['secretkey']);
+                if (is_string($oldapikey) && $oldapikey !== '' && is_string($oldsecret) && $oldsecret !== '') {
+                    $oldhelper = new stripe_helper($oldapikey, $oldsecret);
                     $oldhelper->delete_webhook($paymentaccountid);
                 }
 
-                $newhelper = new stripe_helper($data->apikey, $data->secretkey);
+                $newhelper = new stripe_helper($newapikey, $newsecret);
                 $newhelper->create_webhook($paymentaccountid);
             } catch (Exception $ignored) {
                 $errors['apikey'] = get_string('apiwebhookerror', 'paygw_stripe');
