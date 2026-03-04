@@ -22,6 +22,11 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+/**
+ * Enable the Stripe payment gateway plugin on installation.
+ *
+ * It still needs to be configured and enabled for payment accounts.
+ */
 function xmldb_paygw_stripe_install() {
     global $CFG;
 
