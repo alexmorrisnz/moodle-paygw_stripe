@@ -32,7 +32,7 @@ use core_privacy\local\metadata\collection;
  * @copyright  2021 Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class provider implements \core_privacy\local\request\data_provider, \core_privacy\local\metadata\provider {
+class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\data_provider {
     /**
      * Returns metadata about this plugin.
      *
