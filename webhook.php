@@ -87,8 +87,10 @@ try {
     http_response_code(400);
     exit();
 } catch (SignatureVerificationException $e) {
-    // Invalid signature.
-    http_response_code(400);
+    // Signature mismatch means this event was signed by another webhook's secret.
+    // This happens routinely when multiple payment accounts exist, because Stripe
+    // broadcasts each event to all subscribed webhooks.
+    http_response_code(202);
     exit();
 }
 
