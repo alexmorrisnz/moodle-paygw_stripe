@@ -321,6 +321,7 @@ class stripe_helper {
 
         $customer = $this->stripe->customers->create([
             'email' => $user->email,
+            'name' => fullname($user),
             'description' => get_string('customerdescription', 'paygw_stripe', $user->id),
             'preferred_locales' => [$stripelocale],
         ]);
@@ -447,17 +448,10 @@ class stripe_helper {
         if (!$customer = $this->get_customer($USER->id)) {
             $customer = $this->create_customer($USER);
         } else {
-            // Keep Stripe customer's invoice/email language aligned with Moodle user language.
-            $stripelocale = self::get_stripe_locale_for_user($USER);
-            try {
-                $this->stripe->customers->update($customer->id, [
-                    'preferred_locales' => [$stripelocale],
-                ]);
-            } catch (ApiErrorException $ignored) {
-                // Ignore locale update failures; payment should still proceed.
-                unset($ignored);
-            }
+            $customer = $this->update_customer_details($customer, $USER);
         }
+
+        $stripelocale = self::get_stripe_locale_for_user($USER);
 
         $session = $this->stripe->checkout->sessions->create([
             'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
@@ -562,20 +556,13 @@ class stripe_helper {
             $pricedetails
         );
 
-        $stripelocale = self::get_stripe_locale_for_user($USER);
-
         if (!$customer = $this->get_customer($USER->id)) {
             $customer = $this->create_customer($USER);
         } else {
-            try {
-                $this->stripe->customers->update($customer->id, [
-                    'preferred_locales' => [$stripelocale],
-                ]);
-            } catch (ApiErrorException $ignored) {
-                // Ignore locale update failures; payment should still proceed.
-                unset($ignored);
-            }
+            $customer = $this->update_customer_details($customer, $USER);
         }
+
+        $stripelocale = self::get_stripe_locale_for_user($USER);
 
         $subscriptiondata = [
             'metadata' => [
@@ -1112,6 +1099,22 @@ class stripe_helper {
 
         header("HTTP/1.1 303 See Other");
         header("Location: " . $session->url);
+    }
+
+    /**
+     * Update the customer details based on the given user.
+     *
+     * @param Customer $customer
+     * @param \stdClass $user
+     */
+    private function update_customer_details(Customer $customer, $user) {
+        $stripelocale = self::get_stripe_locale_for_user($user);
+
+        return $this->stripe->customers->update($customer->id, [
+            'email' => $user->email,
+            'name' => fullname($user),
+            'preferred_locales' => [$stripelocale],
+        ]);
     }
 
     /**
