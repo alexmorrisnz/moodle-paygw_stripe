@@ -86,6 +86,85 @@ class stripe_helper {
     }
 
     /**
+     * Map/normalise Moodle language codes to Stripe locales.
+     *
+     * Stripe Checkout "locale" must be one of Stripe's supported locales (or "auto").
+     * Customer "preferred_locales" should also use Stripe-supported locales.
+     *
+     * @param string $moodlelang e.g. "en", "de", "en_us", "pt_br"
+     * @return string Stripe locale, falling back safely to "en"
+     */
+    private static function map_moodle_lang_to_stripe_locale(string $moodlelang): string {
+        if (get_config('paygw_stripe', 'forcedlocale') != '') {
+            return get_config('paygw_stripe', 'forcedlocale');
+        }
+
+        $moodlelang = strtolower(trim($moodlelang));
+
+        // Common/known exceptions and explicit mappings (extend as needed).
+        $explicit = [
+            'no' => 'nb',
+            'pt_br' => 'pt-BR',
+            'zh_cn' => 'zh-Hans',
+            'zh_tw' => 'zh-Hant',
+
+            // Moodle variants that should still be English in Stripe.
+            'en_us' => 'en',
+            'en_au' => 'en',
+        ];
+
+        if (isset($explicit[$moodlelang])) {
+            return $explicit[$moodlelang];
+        }
+
+        // Stripe supported locales whitelist (keeps us from passing invalid values).
+        $supported = [
+            'bg', 'cs', 'da', 'de', 'el', 'en', 'en-GB', 'es', 'es-419', 'et', 'fi', 'fil', 'fr', 'fr-CA',
+            'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'mt', 'nb', 'nl', 'pl', 'pt', 'pt-BR',
+            'ro', 'ru', 'sk', 'sl', 'sv', 'th', 'tr', 'vi', 'zh', 'zh-HK', 'zh-Hans', 'zh-Hant', 'zh-TW',
+        ];
+
+        // Exact match (e.g. "de", "fr").
+        if (in_array($moodlelang, $supported, true)) {
+            return $moodlelang;
+        }
+
+        // Normalise underscores to hyphens: en_us -> en-us, fr_ca -> fr-ca.
+        $normalised = str_replace('_', '-', $moodlelang);
+
+        // Convert language-region to Stripe-style casing: en-us -> en-US.
+        if (preg_match('/^([a-z]{2})-([a-z]{2})$/', $normalised, $m)) {
+            $candidate = $m[1] . '-' . strtoupper($m[2]);
+            if (in_array($candidate, $supported, true)) {
+                return $candidate;
+            }
+        }
+
+        // If Moodle code is a variant like "de_kids" or "es_mx_kids", fall back to base language.
+        $base = preg_split('/[_-]/', $moodlelang, 2)[0] ?? 'en';
+        if (in_array($base, $supported, true)) {
+            return $base;
+        }
+
+        return 'en';
+    }
+
+    /**
+     * Get the Stripe locale to use for this request, preferring user language with site fallback.
+     *
+     * @param \stdClass $user
+     * @return string
+     */
+    private static function get_stripe_locale_for_user(\stdClass $user): string {
+        if (isset($user->lang) && is_string($user->lang) && $user->lang !== '') {
+            $lang = $user->lang;
+        } else {
+            $lang = current_language();
+        }
+        return self::map_moodle_lang_to_stripe_locale($lang);
+    }
+
+    /**
      * Find a product in the database and the corresponding Stripe Product item.
      *
      * @param string $component
@@ -237,9 +316,13 @@ class stripe_helper {
      */
     public function create_customer($user): Customer {
         global $DB;
+
+        $stripelocale = self::get_stripe_locale_for_user($user);
+
         $customer = $this->stripe->customers->create([
             'email' => $user->email,
             'description' => get_string('customerdescription', 'paygw_stripe', $user->id),
+            'preferred_locales' => [$stripelocale],
         ]);
         $record = new \stdClass();
         $record->userid = $user->id;
@@ -363,6 +446,17 @@ class stripe_helper {
 
         if (!$customer = $this->get_customer($USER->id)) {
             $customer = $this->create_customer($USER);
+        } else {
+            // Keep Stripe customer's invoice/email language aligned with Moodle user language.
+            $stripelocale = self::get_stripe_locale_for_user($USER);
+            try {
+                $this->stripe->customers->update($customer->id, [
+                    'preferred_locales' => [$stripelocale],
+                ]);
+            } catch (ApiErrorException $ignored) {
+                // Ignore locale update failures; payment should still proceed.
+                unset($ignored);
+            }
         }
 
         $session = $this->stripe->checkout->sessions->create([
@@ -370,6 +464,7 @@ class stripe_helper {
                 $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
+            'locale' => $stripelocale,
             'payment_method_types' => $config->paymentmethods,
             'payment_method_options' => [
                 'wechat_pay' => [
@@ -467,8 +562,19 @@ class stripe_helper {
             $pricedetails
         );
 
+        $stripelocale = self::get_stripe_locale_for_user($USER);
+
         if (!$customer = $this->get_customer($USER->id)) {
             $customer = $this->create_customer($USER);
+        } else {
+            try {
+                $this->stripe->customers->update($customer->id, [
+                    'preferred_locales' => [$stripelocale],
+                ]);
+            } catch (ApiErrorException $ignored) {
+                // Ignore locale update failures; payment should still proceed.
+                unset($ignored);
+            }
         }
 
         $subscriptiondata = [
@@ -498,6 +604,7 @@ class stripe_helper {
                 $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
+            'locale' => $stripelocale,
             'payment_method_types' => $config->paymentmethods,
             'mode' => 'subscription',
             'line_items' => [[
