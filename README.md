@@ -31,6 +31,7 @@ This plugin can be used with these payment gateways:
 * UPI
 * Klarna
 * New Zealand BECS Direct Debit
+* PayPal
 
 Some of those payment gateways will only work in Stripe if you have provided additional verification details.
 
