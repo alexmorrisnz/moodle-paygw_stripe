@@ -508,7 +508,7 @@ class stripe_helper {
             'customer_update' => [
                 'address' => 'auto',
             ],
-            'expires_at' => time() + $CFG->sessiontimeout,
+            'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
         ]);
 
         return $session->id;
@@ -618,7 +618,7 @@ class stripe_helper {
             'customer_update' => [
                 'address' => 'auto',
             ],
-            'expires_at' => time() + $CFG->sessiontimeout,
+            'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
         ]);
 
         return $session->id;
