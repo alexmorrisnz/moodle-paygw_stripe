@@ -39,7 +39,7 @@ $PAGE->set_title(get_string('subscriptions', 'paygw_stripe'));
 $PAGE->set_heading(get_string('subscriptions', 'paygw_stripe'));
 
 if ($subid != null) {
-    $subscription = $DB->get_record('paygw_stripe_subscriptions', ['id' => $subid], '*', MUST_EXIST);
+    $subscription = $DB->get_record('paygw_stripe_subscriptions', ['id' => $subid, 'userid' => $USER->id], '*', MUST_EXIST);
     $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');
     $stripehelper = new stripe_helper($config->apikey, $config->secretkey);

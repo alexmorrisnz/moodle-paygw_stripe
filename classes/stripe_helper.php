@@ -930,6 +930,12 @@ class stripe_helper {
                 if (!($sessionrecord = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]))) {
                     return false;
                 }
+
+                // Webhook retry already processed this session.
+                if ($sessionrecord->paymentstatus === 'paid') {
+                    return true;
+                }
+
                 $this->save_payment_status($session->id); // Update saved intent status.
 
                 // Deliver course.
@@ -947,7 +953,7 @@ class stripe_helper {
             case 'checkout.session.async_payment_failed':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
                 $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
-                if (!($sessionrecord = $DB->get_record('paygw_stripe_intents', ['checkoutsessionid' => $session->id]))) {
+                if (!($sessionrecord = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]))) {
                     return false;
                 }
                 $this->save_payment_status($session->id); // Update saved intent status.
