@@ -67,6 +67,8 @@ $string['payment:successful:subject'] = 'Payment successful';
 
 $string['paymentcancelled'] = 'Payment was cancelled';
 
+$string['paymenterror'] = 'There was an error processing your payment, please contact the site administrator for help';
+
 $string['paymentmethod:alipay'] = 'Alipay';
 $string['paymentmethod:bancontact'] = 'Bancontact';
 $string['paymentmethod:card'] = 'Card';
