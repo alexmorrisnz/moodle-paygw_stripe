@@ -106,7 +106,7 @@ class subscription_service {
 
         $record = new subscription(
             null,
-            $USER->id,
+            (int)$USER->id,
             $session->subscription,
             $session->customer->id,
             $subscription->status,
@@ -313,7 +313,7 @@ class subscription_service {
         }
 
         $msub = $this->subscriptionrepository->find_by_subscriptionid($moodlesub->subscriptionid);
-        $msub->with_status($subscription->status);
+        $msub = $msub->with_status($subscription->status);
         $this->subscriptionrepository->save($msub);
 
         $product = $this->productrepository->find_by_productid($moodlesub->productid);
