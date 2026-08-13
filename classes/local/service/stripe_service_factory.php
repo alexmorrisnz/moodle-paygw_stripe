@@ -28,12 +28,29 @@ use Stripe\StripeClient;
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class stripe_service_factory {
+    /**
+     * Stripe service factory constructor.
+     *
+     * @param string $apikey Stripe Publishable Key
+     * @param string $secretkey Stripe Secret Key
+     */
     public function __construct(
+        /**
+         * @var string Stripe Publishable Key
+         */
         private string $apikey,
+        /**
+         * @var string Stripe Secret Key
+         */
         private string $secretkey,
     ) {
     }
 
+    /**
+     * Create a new Stripe client.
+     *
+     * @return StripeClient
+     */
     private function stripe_client(): StripeClient {
         return new StripeClient([
             'api_key' => $this->secretkey,
@@ -41,22 +58,47 @@ final class stripe_service_factory {
         ]);
     }
 
+    /**
+     * Create a new webhook service.
+     *
+     * @return webhook_service
+     */
     public function webhook_service(): webhook_service {
         return new webhook_service($this->stripe_client());
     }
 
+    /**
+     * Create a new product pricing service.
+     *
+     * @return product_pricing_service
+     */
     public function product_pricing_service(): product_pricing_service {
         return new product_pricing_service($this->stripe_client());
     }
 
+    /**
+     * Create a new customer service.
+     *
+     * @return customer_service
+     */
     public function customer_service(): customer_service {
         return new customer_service($this->stripe_client());
     }
 
+    /**
+     * Create a new subscription service.
+     *
+     * @return subscription_service
+     */
     public function subscription_service(): subscription_service {
         return new subscription_service($this->stripe_client());
     }
 
+    /**
+     * Create a new checkout service.
+     *
+     * @return checkout_service
+     */
     public function checkout_service(): checkout_service {
         return new checkout_service($this->stripe_client());
     }

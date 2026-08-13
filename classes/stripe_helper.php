@@ -25,9 +25,7 @@
 namespace paygw_stripe;
 
 use core_payment\helper;
-use core_payment\local\entities\payable;
 use core_user;
-use paygw_stripe\local\model\subscription;
 use paygw_stripe\local\service\checkout_service;
 use paygw_stripe\local\service\customer_service;
 use paygw_stripe\local\service\locale_service;
@@ -35,7 +33,6 @@ use paygw_stripe\local\service\product_pricing_service;
 use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\local\service\subscription_service;
 use paygw_stripe\local\service\webhook_service;
-use Stripe\Checkout\Session;
 use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Stripe;
@@ -66,11 +63,29 @@ class stripe_helper {
      */
     public static $apiversion = '2025-06-30.basil';
 
+    /**
+     * @var product_pricing_service Service for managing Stripe products and prices.
+     */
     private product_pricing_service $productpricingservice;
+    /**
+     * @var webhook_service Service for managing Stripe webhooks.
+     */
     private webhook_service $webhookservice;
+    /**
+     * @var customer_service Service for managing Stripe customers.
+     */
     private customer_service $customerservice;
+    /**
+     * @var locale_service Service for resolving locale and currency information.
+     */
     private locale_service $localeservice;
+    /**
+     * @var subscription_service Service for managing Stripe subscriptions.
+     */
     private subscription_service $subscriptionservice;
+    /**
+     * @var checkout_service Service for managing Stripe checkout sessions.
+     */
     private checkout_service $checkoutservice;
 
     /**
@@ -78,6 +93,7 @@ class stripe_helper {
      *
      * @param string $apikey
      * @param string $secretkey
+     * @param stripe_service_factory|null $factory
      */
     public function __construct(
         string $apikey,

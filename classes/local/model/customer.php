@@ -27,13 +27,29 @@ namespace paygw_stripe\local\model;
 final class customer implements mappable_model {
     use mapping_helper;
 
+    /**
+     * Customer constructor.
+     *
+     * @param int|null $id
+     * @param int $userid
+     * @param string $customerid
+     */
     public function __construct(
+        /** @var int|null */
         public readonly ?int $id,
+        /** @var int */
         public readonly int $userid,
+        /** @var string */
         public readonly string $customerid,
     ) {
     }
 
+    /**
+     * Create a customer model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),
@@ -42,6 +58,11 @@ final class customer implements mappable_model {
         );
     }
 
+    /**
+     * Convert the customer model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass {
         $record = new \stdClass();
         $record->id = $this->id;

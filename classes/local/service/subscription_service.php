@@ -68,6 +68,11 @@ class subscription_service {
      */
     private webhook_service $webhookservice;
 
+    /**
+     * Subscription service constructor.
+     *
+     * @param StripeClient $stripe The Stripe API client.
+     */
     public function __construct(StripeClient $stripe) {
         $this->stripe = $stripe;
 

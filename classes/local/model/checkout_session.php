@@ -27,19 +27,87 @@ namespace paygw_stripe\local\model;
 final class checkout_session implements mappable_model {
     use mapping_helper;
 
+    /**
+     * Checkout session constructor.
+     *
+     * @param int|null $id
+     * @param int $userid
+     * @param string|null $checkoutsessionid
+     * @param string|null $paymentintent
+     * @param string $customerid
+     * @param int $amounttotal
+     * @param string|null $paymentstatus
+     * @param string|null $status
+     * @param string $productid
+     */
     public function __construct(
+        /** @var int|null */
         public readonly ?int $id,
+        /** @var int */
         public readonly int $userid,
+        /** @var string|null */
         public readonly ?string $checkoutsessionid,
+        /** @var string|null */
         public readonly ?string $paymentintent,
+        /** @var string */
         public readonly string $customerid,
+        /** @var int */
         public readonly int $amounttotal,
-        public ?string $paymentstatus,
-        public ?string $status,
+        /** @var string|null */
+        public readonly ?string $paymentstatus,
+        /** @var string|null */
+        public readonly ?string $status,
+        /** @var string */
         public readonly string $productid,
     ) {
     }
 
+    /**
+     * Create a new instance with a different status.
+     *
+     * @param string|null $status
+     * @return self
+     */
+    public function with_status(?string $status): self {
+        return new self(
+            id: $this->id,
+            userid: $this->userid,
+            checkoutsessionid: $this->checkoutsessionid,
+            paymentintent: $this->paymentintent,
+            customerid: $this->customerid,
+            amounttotal: $this->amounttotal,
+            paymentstatus: $this->paymentstatus,
+            status: $status,
+            productid: $this->productid,
+        );
+    }
+
+    /**
+     * Create a new instance with a different payment status.
+     *
+     * @param string|null $paymentstatus
+     * @return self
+     */
+    public function with_paymentstatus(?string $paymentstatus): self {
+        return new self(
+            id: $this->id,
+            userid: $this->userid,
+            checkoutsessionid: $this->checkoutsessionid,
+            paymentintent: $this->paymentintent,
+            customerid: $this->customerid,
+            amounttotal: $this->amounttotal,
+            paymentstatus: $paymentstatus,
+            status: $this->status,
+            productid: $this->productid,
+        );
+    }
+
+    /**
+     * Create a checkout session model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),
@@ -54,6 +122,11 @@ final class checkout_session implements mappable_model {
         );
     }
 
+    /**
+     * Convert the checkout session model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass {
         $record = new \stdClass();
         $record->id = $this->id;

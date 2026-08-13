@@ -27,14 +27,32 @@ namespace paygw_stripe\local\model;
 final class webhook implements mappable_model {
     use mapping_helper;
 
+    /**
+     * Webhook constructor.
+     *
+     * @param int|null $id
+     * @param int $paymentaccountid
+     * @param string $webhookid
+     * @param string $secret
+     */
     public function __construct(
+        /** @var int|null */
         public readonly ?int $id,
+        /** @var int */
         public readonly int $paymentaccountid,
+        /** @var string */
         public readonly string $webhookid,
+        /** @var string */
         public readonly string $secret
     ) {
     }
 
+    /**
+     * Create a webhook model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),
@@ -44,6 +62,11 @@ final class webhook implements mappable_model {
         );
     }
 
+    /**
+     * Convert the webhook model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass {
         $record = new \stdClass();
         $record->id = $this->id;

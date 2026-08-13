@@ -44,6 +44,11 @@ class product_pricing_service {
      */
     private $productrepository;
 
+    /**
+     * Product pricing service constructor.
+     *
+     * @param StripeClient $stripe
+     */
     public function __construct(StripeClient $stripe) {
         $this->stripe = $stripe;
 

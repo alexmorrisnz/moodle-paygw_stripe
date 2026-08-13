@@ -27,17 +27,41 @@ namespace paygw_stripe\local\model;
 final class subscription implements mappable_model {
     use mapping_helper;
 
+    /**
+     * Subscription constructor.
+     *
+     * @param int|null $id
+     * @param int $userid
+     * @param string $subscriptionid
+     * @param string $customerid
+     * @param string|null $status
+     * @param string $productid
+     * @param string $priceid
+     */
     public function __construct(
+        /** @var int|null */
         public readonly ?int $id,
+        /** @var int */
         public readonly int $userid,
+        /** @var string */
         public readonly string $subscriptionid,
+        /** @var string */
         public readonly string $customerid,
+        /** @var string|null */
         public readonly ?string $status,
+        /** @var string */
         public readonly string $productid,
+        /** @var string */
         public readonly string $priceid,
     ) {
     }
 
+    /**
+     * Create a new instance with a different status.
+     *
+     * @param string|null $status
+     * @return self
+     */
     public function with_status(?string $status): self {
         return new self(
             id: $this->id,
@@ -50,6 +74,12 @@ final class subscription implements mappable_model {
         );
     }
 
+    /**
+     * Create a subscription model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),
@@ -62,6 +92,11 @@ final class subscription implements mappable_model {
         );
     }
 
+    /**
+     * Convert the subscription model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass {
         $record = new \stdClass();
         $record->id = $this->id;

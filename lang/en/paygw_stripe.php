@@ -133,8 +133,8 @@ $string['subscriptionstatus:paused'] = 'Paused';
 $string['subscriptionstatus:trialing'] = 'Trialing';
 $string['subscriptionstatus:unpaid'] = 'Unpaid';
 
-$string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
 $string['subscriptioninvalid'] = 'Invalid subscription, please contact the site administrator for help';
+$string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
 
 $string['taxbehavior:exclusive'] = 'Exclusive';
 $string['taxbehavior:inclusive'] = 'Inclusive';

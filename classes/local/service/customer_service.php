@@ -45,6 +45,12 @@ class customer_service {
      */
     private $localeservice;
 
+    /**
+     * Customer service constructor.
+     *
+     * @param StripeClient $stripe
+     * @param locale_service|null $localeservice
+     */
     public function __construct(StripeClient $stripe, ?locale_service $localeservice = null) {
         $this->stripe = $stripe;
 

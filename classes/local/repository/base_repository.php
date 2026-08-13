@@ -24,12 +24,21 @@ use paygw_stripe\local\model\mappable_model;
 /**
  * Base repository that provides basic CRUD operations.
  *
+ * @phpcs:ignore moodle.Commenting.ValidTags.Invalid
  * @template  T of mappable_model
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class base_repository {
-    public function __construct(protected ?moodle_database $db = null) {
+    /**
+     * Base repository constructor.
+     *
+     * @param moodle_database|null $db Database instance, defaults to the global $DB.
+     */
+    public function __construct(
+        /** @var moodle_database|null */
+        protected ?moodle_database $db = null
+    ) {
         global $DB;
         $this->db ??= $DB;
     }

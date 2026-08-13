@@ -25,6 +25,17 @@ namespace paygw_stripe\local\model;
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 interface mappable_model {
+    /**
+     * Create a model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self;
+    /**
+     * Convert the model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass;
 }

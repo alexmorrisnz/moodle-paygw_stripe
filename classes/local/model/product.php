@@ -27,15 +27,35 @@ namespace paygw_stripe\local\model;
 final class product implements mappable_model {
     use mapping_helper;
 
+    /**
+     * Product constructor.
+     *
+     * @param int|null $id
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @param string $productid
+     */
     public function __construct(
+        /** @var int|null */
         public readonly ?int $id,
+        /** @var string */
         public readonly string $component,
+        /** @var string */
         public readonly string $paymentarea,
+        /** @var int */
         public readonly int $itemid,
+        /** @var string */
         public readonly string $productid,
     ) {
     }
 
+    /**
+     * Create a product model from a record.
+     *
+     * @param \stdClass $record
+     * @return self
+     */
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),
@@ -46,6 +66,11 @@ final class product implements mappable_model {
         );
     }
 
+    /**
+     * Convert the product model to a record.
+     *
+     * @return \stdClass
+     */
     public function to_record(): \stdClass {
         $record = new \stdClass();
         $record->id = $this->id;

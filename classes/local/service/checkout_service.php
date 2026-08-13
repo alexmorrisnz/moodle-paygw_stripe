@@ -61,6 +61,11 @@ class checkout_service {
      */
     private subscription_service $subscriptionservice;
 
+    /**
+     * Checkout service constructor.
+     *
+     * @param StripeClient $stripe
+     */
     public function __construct(StripeClient $stripe) {
         $this->stripe = $stripe;
 
@@ -227,8 +232,7 @@ class checkout_service {
 
         $storedsession = $this->checkoutrepository->find_by_sessionid($session->id);
         if ($storedsession != null) {
-            $storedsession->status = $session->status;
-            $storedsession->paymentstatus = $session->payment_status;
+            $storedsession = $storedsession->with_status($session->status)->with_paymentstatus($session->payment_status);
             $this->checkoutrepository->save($storedsession);
             return;
         }

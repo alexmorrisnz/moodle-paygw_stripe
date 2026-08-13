@@ -25,18 +25,44 @@ namespace paygw_stripe\local\model;
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 trait mapping_helper {
+    /**
+     * Convert a value to a nullable string.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
     protected static function to_nullable_string(mixed $value): ?string {
         return $value === null ? null : (string)$value;
     }
 
+    /**
+     * Get a nullable string field from a record.
+     *
+     * @param \stdClass $record
+     * @param string $field
+     * @return string|null
+     */
     protected static function nullable_string_field(\stdClass $record, string $field): ?string {
         return property_exists($record, $field) ? self::to_nullable_string($record->{$field}) : null;
     }
 
+    /**
+     * Convert a value to a nullable integer.
+     *
+     * @param mixed $value
+     * @return int|null
+     */
     protected static function to_nullable_int(mixed $value): ?int {
         return $value === null ? null : (int)$value;
     }
 
+    /**
+     * Get a nullable integer field from a record.
+     *
+     * @param \stdClass $record
+     * @param string $field
+     * @return int|null
+     */
     protected static function nullable_int_field(\stdClass $record, string $field): ?int {
         return property_exists($record, $field) ? self::to_nullable_int($record->{$field}) : null;
     }

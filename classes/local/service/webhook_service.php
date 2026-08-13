@@ -42,6 +42,11 @@ class webhook_service {
      */
     private $webhookrepository;
 
+    /**
+     * Webhook service constructor.
+     *
+     * @param StripeClient $stripe The Stripe API client.
+     */
     public function __construct(StripeClient $stripe) {
         $this->stripe = $stripe;
 
