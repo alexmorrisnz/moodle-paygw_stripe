@@ -38,6 +38,18 @@ final class subscription implements mappable_model {
     ) {
     }
 
+    public function with_status(?string $status): self {
+        return new self(
+            id: $this->id,
+            userid: $this->userid,
+            subscriptionid: $this->subscriptionid,
+            customerid: $this->customerid,
+            status: $status,
+            productid: $this->productid,
+            priceid: $this->priceid,
+        );
+    }
+
     public static function from_record(\stdClass $record): self {
         return new self(
             id: self::nullable_int_field($record, 'id'),

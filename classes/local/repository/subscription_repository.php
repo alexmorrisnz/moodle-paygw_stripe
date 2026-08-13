@@ -48,4 +48,17 @@ final class subscription_repository extends base_repository {
         $records = $DB->get_records('paygw_stripe_subscriptions', ['userid' => $userid]);
         return array_map([$this, 'hydrate'], $records);
     }
+
+    /**
+     * Find a subscription by Stripe subscription id.
+     *
+     * @param string $subscriptionid
+     * @return subscription|null
+     * @throws \dml_exception
+     */
+    public function find_by_subscriptionid(string $subscriptionid): ?subscription {
+        global $DB;
+        $record = $DB->get_record($this->table(), ['subscriptionid' => $subscriptionid]);
+        return $record ? $this->hydrate($record) : null;
+    }
 }

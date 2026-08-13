@@ -126,7 +126,6 @@ function paygw_stripe_recreate_webhooks() {
                 continue;
             }
             try {
-
                 $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
                 $webhookservice = $factory->webhook_service();
                 $webhookservice->delete_webhook($account->get('id'));

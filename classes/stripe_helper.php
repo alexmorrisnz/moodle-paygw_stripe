@@ -141,8 +141,6 @@ class stripe_helper {
      * @throws ApiErrorException|\dml_exception
      */
     public function process_stripe_event(Event $event, array $metadata): bool {
-        global $DB;
-
         if (!isset($event->data->object)) {
             return false;
         }
@@ -153,7 +151,7 @@ class stripe_helper {
             case 'checkout.session.async_payment_succeeded':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
                 $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
-                if (!($sessionrecord = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]))) {
+                if (!($sessionrecord = $this->checkoutservice->find_session($session->id))) {
                     return false;
                 }
 
@@ -179,7 +177,7 @@ class stripe_helper {
             case 'checkout.session.async_payment_failed':
                 // Events are sent to all subscribed webhooks, verify we are the correct receipt for this event.
                 $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
-                if (!($sessionrecord = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => $session->id]))) {
+                if (!($sessionrecord = $this->checkoutservice->find_session($session->id))) {
                     return false;
                 }
                 $this->checkoutservice->save_payment_status($session->id); // Update saved intent status.
@@ -188,18 +186,16 @@ class stripe_helper {
                 break;
             // Handle customer subscriptions being deleted.
             case 'customer.subscription.deleted':
-                if (!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
+                if (!($moodlesub = $this->subscriptionservice->find_subscription($event->data->object->id))) {
                     return false;
                 }
-                $this->subscriptionservice->cancel_subscription(subscription::from_record($moodlesub), false);
+                $this->subscriptionservice->cancel_subscription($moodlesub, false);
                 break;
             case 'customer.subscription.updated':
-                if (!($moodlesub = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $event->data->object->id]))) {
+                if (!($moodlesub = $this->subscriptionservice->find_subscription($event->data->object->id))) {
                     return false;
                 }
-                $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
-                $moodlesub->status = $subscription->status;
-                $DB->update_record('paygw_stripe_subscriptions', $moodlesub);
+                $this->subscriptionservice->sync_status($moodlesub);
                 break;
             default:
                 return false;

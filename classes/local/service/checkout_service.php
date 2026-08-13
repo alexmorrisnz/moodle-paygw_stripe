@@ -278,4 +278,15 @@ class checkout_service {
             $this->save_checkout_session($session);
         }
     }
+
+    /**
+     * Find a stored checkout session by Stripe session id.
+     *
+     * @param string $sessionid
+     * @return checkout_session|null
+     * @throws \dml_exception
+     */
+    public function find_session(string $sessionid): ?checkout_session {
+        return $this->checkoutrepository->find_by_sessionid($sessionid);
+    }
 }

@@ -25,6 +25,7 @@ use DateTimeZone;
 use moodle_url;
 use paygw_stripe\gateway;
 use paygw_stripe\local\model\subscription;
+use paygw_stripe\local\repository\product_repository;
 use paygw_stripe\local\repository\subscription_repository;
 use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
@@ -47,6 +48,10 @@ class subscription_service {
      */
     private subscription_repository $subscriptionrepository;
     /**
+     * @var product_repository The product repository.
+     */
+    private product_repository $productrepository;
+    /**
      * @var product_pricing_service The product pricing service.
      */
     private product_pricing_service $productpricingservice;
@@ -67,6 +72,8 @@ class subscription_service {
         $this->stripe = $stripe;
 
         $this->subscriptionrepository = new subscription_repository();
+        $this->productrepository = new product_repository();
+
         $this->productpricingservice = new product_pricing_service($stripe);
         $this->customerservice = new customer_service($stripe);
         $this->localeservice = new locale_service();
@@ -81,26 +88,50 @@ class subscription_service {
      * @throws \dml_exception
      */
     public function save_subscription(Session $session) {
-        global $DB, $USER;
+        global $USER;
 
         $subscription = $this->stripe->subscriptions->retrieve($session->subscription);
 
-        $datum = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $session->subscription]);
-        if ($datum != null) {
-            $datum->status = $subscription->status;
-            $DB->update_record('paygw_stripe_subscriptions', $datum);
+        $msub = $this->subscriptionrepository->find_by_subscriptionid($session->subscription);
+        if ($msub != null) {
+            $msub = $msub->with_status($subscription->status);
+            $this->subscriptionrepository->save($msub);
             return;
         }
 
-        $datum = new \stdClass();
-        $datum->userid = $USER->id;
-        $datum->subscriptionid = $session->subscription;
-        $datum->customerid = $session->customer->id;
-        $datum->status = $subscription->status;
-        $datum->productid = $session->line_items->first()->price->product;
-        $datum->priceid = $session->line_items->first()->price->id;
+        $record = new subscription(
+            null,
+            $USER->id,
+            $session->subscription,
+            $session->customer->id,
+            $subscription->status,
+            $session->line_items->first()->price->product,
+            $session->line_items->first()->price->id
+        );
+        $this->subscriptionrepository->save($record);
+    }
 
-        $DB->insert_record('paygw_stripe_subscriptions', $datum);
+    /**
+     * Find a stored subscription by Stripe subscription id.
+     *
+     * @param string $subscriptionid
+     * @return subscription|null
+     * @throws \dml_exception
+     */
+    public function find_subscription(string $subscriptionid): ?subscription {
+        return $this->subscriptionrepository->find_by_subscriptionid($subscriptionid);
+    }
+
+    /**
+     * Refresh the stored status for a subscription from Stripe.
+     *
+     * @param subscription $moodlesub
+     * @return void
+     * @throws ApiErrorException|\dml_exception
+     */
+    public function sync_status(subscription $moodlesub): void {
+        $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
+        $this->subscriptionrepository->save($moodlesub->with_status($subscription->status));
     }
 
     /**
@@ -275,11 +306,12 @@ class subscription_service {
         } else {
             $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
         }
-        $datum = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => $moodlesub->subscriptionid]);
-        $datum->status = $subscription->status;
-        $DB->update_record('paygw_stripe_subscriptions', $datum);
 
-        $product = $DB->get_record('paygw_stripe_products', ['productid' => $moodlesub->productid]);
+        $msub = $this->subscriptionrepository->find_by_subscriptionid($moodlesub->subscriptionid);
+        $msub->with_status($subscription->status);
+        $this->subscriptionrepository->save($msub);
+
+        $product = $this->productrepository->find_by_productid($moodlesub->productid);
         if ($product->component == 'enrol_fee') {
             // A course was the product. Let's unenrol the user.
             $instance = $DB->get_record('enrol', ['enrol' => 'fee', 'id' => $product->itemid], '*', MUST_EXIST);
