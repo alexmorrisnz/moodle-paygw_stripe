@@ -71,8 +71,8 @@ abstract class base_repository {
     /**
      * Save a model.
      *
-     * @param T $model
-     * @return T
+     * @param mappable_model $model The model to save.
+     * @return mappable_model
      */
     public function save(mappable_model $model): mappable_model {
         $record = $model->to_record();

@@ -111,6 +111,7 @@ $string['stripeaccount'] = 'Stripe account ID';
 $string['stripeaccount_help'] = 'For creating the direct charge branding page';
 $string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
 $string['subscriptioninterval'] = 'Subscription Period';
+$string['subscriptioninvalid'] = 'Invalid subscription, please contact the site administrator for help';
 
 $string['subscriptionperiod:custom'] = 'Custom';
 $string['subscriptionperiod:daily'] = 'Daily';
@@ -133,7 +134,6 @@ $string['subscriptionstatus:paused'] = 'Paused';
 $string['subscriptionstatus:trialing'] = 'Trialing';
 $string['subscriptionstatus:unpaid'] = 'Unpaid';
 
-$string['subscriptioninvalid'] = 'Invalid subscription, please contact the site administrator for help';
 $string['subscriptionsuccessful'] = 'Successfully subscribed. You can manage your Stripe Payment subscriptions from your profile page.';
 
 $string['taxbehavior:exclusive'] = 'Exclusive';
