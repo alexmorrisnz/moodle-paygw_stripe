@@ -34,4 +34,20 @@ final class checkout_session_repository extends base_repository {
     protected function model_class(): string {
         return checkout_session::class;
     }
+
+    /**
+     * Find a checkout session record by sessionid.
+     *
+     * @param string $sessionid
+     * @return checkout_session|null
+     * @throws \dml_exception
+     */
+    public function find_by_sessionid(string $sessionid): ?checkout_session {
+        global $DB;
+        $record = $DB->get_record($this->table(), ['checkoutsessionid' => $sessionid]);
+        if (!$record) {
+            return null;
+        }
+        return $this->hydrate($record);
+    }
 }

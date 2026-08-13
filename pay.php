@@ -44,9 +44,9 @@ $surcharge = helper::get_gateway_surcharge('stripe');
 $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), $surcharge);
 
 $factory = new stripe_service_factory($config->apikey, $config->secretkey);
-$stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 if (!isset($config->type) || $config->type == 'onetime') {
-    $sessionid = $stripehelper->generate_payment(
+    $checkoutservice = $factory->checkout_service();
+    $sessionid = $checkoutservice->generate_payment(
         $config,
         $payable,
         $description,

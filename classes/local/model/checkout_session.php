@@ -34,8 +34,8 @@ final class checkout_session implements mappable_model {
         public readonly ?string $paymentintent,
         public readonly string $customerid,
         public readonly int $amounttotal,
-        public readonly ?string $paymentstatus,
-        public readonly ?string $status,
+        public ?string $paymentstatus,
+        public ?string $status,
         public readonly string $productid,
     ) {
     }

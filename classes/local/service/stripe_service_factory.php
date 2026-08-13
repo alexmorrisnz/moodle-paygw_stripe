@@ -56,4 +56,8 @@ final class stripe_service_factory {
     public function subscription_service(): subscription_service {
         return new subscription_service($this->stripe_client());
     }
+
+    public function checkout_service(): checkout_service {
+        return new checkout_service($this->stripe_client());
+    }
 }
