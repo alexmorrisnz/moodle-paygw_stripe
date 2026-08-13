@@ -34,4 +34,47 @@ final class product_repository extends base_repository {
     protected function model_class(): string {
         return product::class;
     }
+
+    /**
+     * Get product by component, paymentarea and itemid.
+     *
+     * @param string $component
+     * @param string $paymentarea
+     * @param string $itemid
+     * @return product|null
+     * @throws \dml_exception
+     */
+    public function get_product_by_parts(string $component, string $paymentarea, string $itemid): product|null {
+        global $DB;
+
+        if (empty($component) || empty($paymentarea) || empty($itemid)) {
+            return null;
+        }
+
+        $record = $DB->get_record(
+            'paygw_stripe_products',
+            ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]
+        );
+
+        if (!$record) {
+            return null;
+        }
+
+        return $this->hydrate($record);
+    }
+
+    /**
+     * Delete product by component, paymentarea and itemid.
+     *
+     * @param string $component
+     * @param string $paymentarea
+     * @param string $itemid
+     * @return void
+     * @throws \dml_exception
+     */
+    public function delete_product_by_parts(string $component, string $paymentarea, string $itemid): void {
+        global $DB;
+
+        $DB->delete_records('paygw_stripe_products', ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]);
+    }
 }

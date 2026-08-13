@@ -31,6 +31,7 @@ use DateInterval;
 use DateTime;
 use DateTimeZone;
 use moodle_url;
+use paygw_stripe\local\service\product_pricing_service;
 use Stripe\Checkout\Session;
 use Stripe\Customer;
 use Stripe\Event;
@@ -53,7 +54,7 @@ require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
  */
 class stripe_helper {
     /**
-     * @var StripeClient Secret API key (Do not publish).
+     * @var StripeClient The Stripe API client.
      */
     private $stripe;
     /**
@@ -65,6 +66,8 @@ class stripe_helper {
      * @var string Stripe API version set explicitly in Stripe client.
      */
     public static $apiversion = '2025-06-30.basil';
+
+    private product_pricing_service $productpricingservice;
 
     /**
      * Initialise the Stripe API client.
@@ -83,6 +86,8 @@ class stripe_helper {
             get_config('paygw_stripe')->version,
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
+
+        $this->productpricingservice = new product_pricing_service($this->stripe);
     }
 
     /**
@@ -165,125 +170,6 @@ class stripe_helper {
     }
 
     /**
-     * Find a product in the database and the corresponding Stripe Product item.
-     *
-     * @param string $component
-     * @param string $paymentarea
-     * @param string $itemid
-     * @return Product|null
-     * @throws \dml_exception
-     */
-    public function get_product(string $component, string $paymentarea, string $itemid): ?Product {
-        global $DB;
-
-        if (
-            $record = $DB->get_record(
-                'paygw_stripe_products',
-                ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]
-            )
-        ) {
-            try {
-                return $this->stripe->products->retrieve($record->productid);
-            } catch (ApiErrorException $e) {
-                // Product exists in Moodle but not in stripe, possibly the keys were switched.
-                // Delete product for creation later.
-                $DB->delete_records(
-                    'paygw_stripe_products',
-                    ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]
-                );
-                return null;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Create a product in Stripe and save the ID into the Moodle database.
-     *
-     * @param string $description
-     * @param string $component
-     * @param string $paymentarea
-     * @param string $itemid
-     * @return Product
-     * @throws ApiErrorException
-     * @throws \dml_exception
-     */
-    public function create_product(string $description, string $component, string $paymentarea, string $itemid): Product {
-        global $DB;
-        $product = $this->stripe->products->create([
-            'name' => $description,
-        ]);
-        $record = new \stdClass();
-        $record->productid = $product->id;
-        $record->component = $component;
-        $record->paymentarea = $paymentarea;
-        $record->itemid = $itemid;
-        $DB->insert_record('paygw_stripe_products', $record);
-        return $product;
-    }
-
-    /**
-     * Get the first price listed on a product.
-     *
-     * @param Product $product
-     * @param bool $subscription
-     * @return Price|null
-     */
-    public function get_price(Product $product, bool $subscription = false): ?Price {
-        try {
-            $prices = $this->stripe->prices->all(['product' => $product->id]);
-            foreach ($prices as $price) {
-                if ($price instanceof Price) {
-                    if ($price->active) {
-                        if ($subscription && $price->type == 'recurring') {
-                            return $price;
-                        } else if (!$subscription) {
-                            return $price;
-                        }
-                    }
-                }
-            }
-            return null;
-        } catch (ApiErrorException $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Create a price against an associated product.
-     *
-     * @param string $currency Currency
-     * @param string $productid Product ID
-     * @param float $unitamount Price
-     * @param bool $automatictax Toggles insertion of a tax behavior
-     * @param string|null $defaultbehavior The default tax behavior for the price, if enabled
-     * @param array|null $recurring
-     * @return Price
-     * @throws ApiErrorException
-     */
-    public function create_price(
-        string $currency,
-        string $productid,
-        float $unitamount,
-        bool $automatictax,
-        ?string $defaultbehavior = null,
-        ?array $recurring = null
-    ) {
-        $pricedata = [
-            'currency' => $currency,
-            'product' => $productid,
-            'unit_amount' => $unitamount,
-        ];
-        if ($automatictax == 1) {
-            $pricedata['tax_behavior'] = $defaultbehavior ?? 'inclusive';
-        }
-        if (is_array($recurring)) {
-            $pricedata['recurring'] = $recurring;
-        }
-        return $this->stripe->prices->create($pricedata);
-    }
-
-    /**
      * Get the stripe Customer object from the corresponding Moodle user id.
      *
      * @param int $userid
@@ -333,82 +219,6 @@ class stripe_helper {
     }
 
     /**
-     * Creates Stripe product and price objects together.
-     * Stores object IDs in Moodle to prevent creating duplicates.
-     *
-     * @param object $config
-     * @param payable $payable
-     * @param string $description
-     * @param float $cost
-     * @param string $component
-     * @param string $paymentarea
-     * @param string $itemid
-     * @param array|null $subscription
-     * @return array
-     * @throws ApiErrorException
-     * @throws \dml_exception
-     */
-    private function create_product_and_price(
-        object $config,
-        payable $payable,
-        string $description,
-        float $cost,
-        string $component,
-        string $paymentarea,
-        string $itemid,
-        ?array $subscription = null
-    ) {
-        $unitamount = $this->get_unit_amount($cost, $payable->get_currency());
-        $currency = strtolower($payable->get_currency());
-
-        if (!$product = $this->get_product($component, $paymentarea, $itemid)) {
-            $product = $this->create_product($description, $component, $paymentarea, $itemid);
-        }
-        if (!$price = $this->get_price($product, is_array($subscription))) {
-            $price = $this->create_price(
-                $currency,
-                $product->id,
-                $unitamount,
-                $config->enableautomatictax == 1,
-                $config->defaulttaxbehavior,
-                $subscription
-            );
-        } else {
-            // Check if the price details mismatch in any way.
-            if (
-                $price->unit_amount != $unitamount || $price->currency != $currency ||
-                (is_array($subscription) && $price->type != 'recurring') ||
-                (is_array($subscription) && $price->type == 'recurring' &&
-                    ($price->recurring->toArray()['interval'] != $subscription['interval'] ||
-                        $price->recurring->toArray()['interval_count'] != $subscription['interval_count'])) ||
-                ($price->type == 'recurring' && !is_array($subscription))
-            ) {
-                // We cannot update the price or currency, so we must create a new price.
-                $this->stripe->prices->update($price->id, ['active' => false]);
-                $price = $this->create_price(
-                    $currency,
-                    $product->id,
-                    $unitamount,
-                    $config->enableautomatictax == 1,
-                    $config->defaulttaxbehavior,
-                    $subscription
-                );
-            }
-            // Set tax behavior if not set already.
-            if ($config->enableautomatictax == 1 && (!isset($price->tax_behavior) || $price->tax_behavior === 'unspecified')) {
-                $price->updateAttributes(['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
-                $price = $this->stripe->prices->update($price->id, ['tax_behavior' => $config->tax_behavior ?? 'inclusive']);
-            }
-        }
-        if ($product->name != $description) {
-            $product->name = $description;
-            $product = $this->stripe->products->update($product->id, ['name' => $description]);
-        }
-
-        return [$product, $price];
-    }
-
-    /**
      * Create a payment intent and return with the checkout session id.
      *
      * @param object $config
@@ -435,7 +245,7 @@ class stripe_helper {
         // Ensure webhook exists before we potentially use it.
         $this->create_webhook($payable->get_account_id());
 
-        [$product, $price] = $this->create_product_and_price(
+        [$product, $price] = $this->productpricingservice->create_product_and_price(
             $config,
             $payable,
             $description,
@@ -546,7 +356,7 @@ class stripe_helper {
 
         $pricedetails = $this->get_subscription_config_price_details($config);
 
-        [$product, $price] = $this->create_product_and_price(
+        [$product, $price] = $this->productpricingservice->create_product_and_price(
             $config,
             $payable,
             $description,
@@ -672,20 +482,6 @@ class stripe_helper {
         $session = $this->stripe->checkout->sessions->retrieve($sessionid);
         $subscription = $this->stripe->subscriptions->retrieve($session->subscription);
         return $subscription->status;
-    }
-
-    /**
-     * Convert the cost into the unit amount accounting for zero-decimal currencies.
-     *
-     * @param float $cost
-     * @param string $currency
-     * @return float
-     */
-    public function get_unit_amount(float $cost, string $currency): float {
-        if (in_array(strtoupper($currency), gateway::get_zero_decimal_currencies())) {
-            return $cost;
-        }
-        return $cost * 100;
     }
 
     /**
