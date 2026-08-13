@@ -48,4 +48,8 @@ final class stripe_service_factory {
     public function product_pricing_service(): product_pricing_service {
         return new product_pricing_service($this->stripe_client());
     }
+
+    public function customer_service(): customer_service {
+        return new customer_service($this->stripe_client());
+    }
 }

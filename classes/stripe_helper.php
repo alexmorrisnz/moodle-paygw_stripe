@@ -31,16 +31,16 @@ use DateInterval;
 use DateTime;
 use DateTimeZone;
 use moodle_url;
+use paygw_stripe\local\service\customer_service;
+use paygw_stripe\local\service\locale_service;
 use paygw_stripe\local\service\product_pricing_service;
 use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\local\service\webhook_service;
 use Stripe\Checkout\Session;
-use Stripe\Customer;
 use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Stripe;
 use Stripe\StripeClient;
-use Stripe\WebhookEndpoint;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -69,6 +69,8 @@ class stripe_helper {
 
     private product_pricing_service $productpricingservice;
     private webhook_service $webhookservice;
+    private customer_service $customerservice;
+    private locale_service $localeservice;
 
     /**
      * Initialise the Stripe API client.
@@ -98,134 +100,8 @@ class stripe_helper {
 
         $this->productpricingservice = $factory->product_pricing_service();
         $this->webhookservice = $factory->webhook_service();
-    }
-
-    /**
-     * Map/normalise Moodle language codes to Stripe locales.
-     *
-     * Stripe Checkout "locale" must be one of Stripe's supported locales (or "auto").
-     * Customer "preferred_locales" should also use Stripe-supported locales.
-     *
-     * @param string $moodlelang e.g. "en", "de", "en_us", "pt_br"
-     * @return string Stripe locale, falling back safely to "en"
-     */
-    private static function map_moodle_lang_to_stripe_locale(string $moodlelang): string {
-        if (get_config('paygw_stripe', 'forcedlocale') != '') {
-            return get_config('paygw_stripe', 'forcedlocale');
-        }
-
-        $moodlelang = strtolower(trim($moodlelang));
-
-        // Common/known exceptions and explicit mappings (extend as needed).
-        $explicit = [
-            'no' => 'nb',
-            'pt_br' => 'pt-BR',
-            'zh_cn' => 'zh-Hans',
-            'zh_tw' => 'zh-Hant',
-
-            // Moodle variants that should still be English in Stripe.
-            'en_us' => 'en',
-            'en_au' => 'en',
-        ];
-
-        if (isset($explicit[$moodlelang])) {
-            return $explicit[$moodlelang];
-        }
-
-        // Stripe supported locales whitelist (keeps us from passing invalid values).
-        $supported = [
-            'bg', 'cs', 'da', 'de', 'el', 'en', 'en-GB', 'es', 'es-419', 'et', 'fi', 'fil', 'fr', 'fr-CA',
-            'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'mt', 'nb', 'nl', 'pl', 'pt', 'pt-BR',
-            'ro', 'ru', 'sk', 'sl', 'sv', 'th', 'tr', 'vi', 'zh', 'zh-HK', 'zh-Hans', 'zh-Hant', 'zh-TW',
-        ];
-
-        // Exact match (e.g. "de", "fr").
-        if (in_array($moodlelang, $supported, true)) {
-            return $moodlelang;
-        }
-
-        // Normalise underscores to hyphens: en_us -> en-us, fr_ca -> fr-ca.
-        $normalised = str_replace('_', '-', $moodlelang);
-
-        // Convert language-region to Stripe-style casing: en-us -> en-US.
-        if (preg_match('/^([a-z]{2})-([a-z]{2})$/', $normalised, $m)) {
-            $candidate = $m[1] . '-' . strtoupper($m[2]);
-            if (in_array($candidate, $supported, true)) {
-                return $candidate;
-            }
-        }
-
-        // If Moodle code is a variant like "de_kids" or "es_mx_kids", fall back to base language.
-        $base = preg_split('/[_-]/', $moodlelang, 2)[0] ?? 'en';
-        if (in_array($base, $supported, true)) {
-            return $base;
-        }
-
-        return 'en';
-    }
-
-    /**
-     * Get the Stripe locale to use for this request, preferring user language with site fallback.
-     *
-     * @param \stdClass $user
-     * @return string
-     */
-    private static function get_stripe_locale_for_user(\stdClass $user): string {
-        if (isset($user->lang) && is_string($user->lang) && $user->lang !== '') {
-            $lang = $user->lang;
-        } else {
-            $lang = current_language();
-        }
-        return self::map_moodle_lang_to_stripe_locale($lang);
-    }
-
-    /**
-     * Get the stripe Customer object from the corresponding Moodle user id.
-     *
-     * @param int $userid
-     * @return Customer|null
-     * @throws \dml_exception
-     */
-    public function get_customer(int $userid): ?Customer {
-        global $DB;
-        if (!$record = $DB->get_record('paygw_stripe_customers', ['userid' => $userid])) {
-            return null;
-        }
-        try {
-            return $this->stripe->customers->retrieve($record->customerid);
-        } catch (ApiErrorException $e) {
-            // Customer exists in Moodle but not in stripe, possibly the keys were switched.
-            // Delete customer for creation later.
-            $DB->delete_records('paygw_stripe_customers', ['userid' => $userid]);
-            return null;
-        }
-    }
-
-    /**
-     * Create a Stripe customer object and save the ID and user ID into the database.
-     *
-     * @param \stdClass $user
-     * @return Customer
-     * @throws ApiErrorException
-     * @throws \coding_exception
-     * @throws \dml_exception
-     */
-    public function create_customer($user): Customer {
-        global $DB;
-
-        $stripelocale = self::get_stripe_locale_for_user($user);
-
-        $customer = $this->stripe->customers->create([
-            'email' => $user->email,
-            'name' => fullname($user),
-            'description' => get_string('customerdescription', 'paygw_stripe', $user->id),
-            'preferred_locales' => [$stripelocale],
-        ]);
-        $record = new \stdClass();
-        $record->userid = $user->id;
-        $record->customerid = $customer->id;
-        $DB->insert_record('paygw_stripe_customers', $record);
-        return $customer;
+        $this->customerservice = $factory->customer_service();
+        $this->localeservice = new locale_service();
     }
 
     /**
@@ -265,13 +141,13 @@ class stripe_helper {
             $itemid
         );
 
-        if (!$customer = $this->get_customer($USER->id)) {
-            $customer = $this->create_customer($USER);
+        if (!$customer = $this->customerservice->get_customer($USER->id)) {
+            $customer = $this->customerservice->create_customer($USER);
         } else {
-            $customer = $this->update_customer_details($customer, $USER);
+            $customer = $this->customerservice->update_customer_details($customer, $USER);
         }
 
-        $stripelocale = self::get_stripe_locale_for_user($USER);
+        $stripelocale = $this->localeservice->get_stripe_locale_for_user($USER);
 
         $session = $this->stripe->checkout->sessions->create([
             'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
@@ -377,13 +253,13 @@ class stripe_helper {
             $pricedetails
         );
 
-        if (!$customer = $this->get_customer($USER->id)) {
-            $customer = $this->create_customer($USER);
+        if (!$customer = $this->customerservice->get_customer($USER->id)) {
+            $customer = $this->customerservice->create_customer($USER);
         } else {
-            $customer = $this->update_customer_details($customer, $USER);
+            $customer = $this->customerservice->update_customer_details($customer, $USER);
         }
 
-        $stripelocale = self::get_stripe_locale_for_user($USER);
+        $stripelocale = $this->localeservice->get_stripe_locale_for_user($USER);
 
         $subscriptiondata = [
             'metadata' => [
@@ -831,22 +707,6 @@ class stripe_helper {
 
         header("HTTP/1.1 303 See Other");
         header("Location: " . $session->url);
-    }
-
-    /**
-     * Update the customer details based on the given user.
-     *
-     * @param Customer $customer
-     * @param \stdClass $user
-     */
-    private function update_customer_details(Customer $customer, $user) {
-        $stripelocale = self::get_stripe_locale_for_user($user);
-
-        return $this->stripe->customers->update($customer->id, [
-            'email' => $user->email,
-            'name' => fullname($user),
-            'preferred_locales' => [$stripelocale],
-        ]);
     }
 
     /**

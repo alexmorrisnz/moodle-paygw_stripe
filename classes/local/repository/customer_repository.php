@@ -34,4 +34,32 @@ final class customer_repository extends base_repository {
     protected function model_class(): string {
         return customer::class;
     }
+
+    /**
+     * Find a customer record by Moodle userid.
+     *
+     * @param int $userid
+     * @return customer|null
+     * @throws \dml_exception
+     */
+    public function find_by_userid(int $userid): ?customer {
+        $record = $this->db->get_record($this->table(), ['userid' => $userid]);
+
+        if (!$record) {
+            return null;
+        }
+
+        return $this->hydrate($record);
+    }
+
+    /**
+     * Delete a customer record by Moodle userid.
+     *
+     * @param int $userid
+     * @return void
+     * @throws \dml_exception
+     */
+    public function delete_by_userid(int $userid): void {
+        $this->db->delete_records($this->table(), ['userid' => $userid]);
+    }
 }

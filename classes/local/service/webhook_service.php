@@ -19,7 +19,6 @@ declare(strict_types=1);
 namespace paygw_stripe\local\service;
 
 use paygw_stripe\local\model\webhook;
-use paygw_stripe\local\repository\product_repository;
 use paygw_stripe\local\repository\webhook_repository;
 use paygw_stripe\stripe_helper;
 use Stripe\Exception\ApiErrorException;
