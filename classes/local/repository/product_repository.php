@@ -77,4 +77,13 @@ final class product_repository extends base_repository {
 
         $DB->delete_records('paygw_stripe_products', ['component' => $component, 'paymentarea' => $paymentarea, 'itemid' => $itemid]);
     }
+
+    public function find_by_productid(string $productid): ?product {
+        global $DB;
+        $record = $DB->get_record('paygw_stripe_products', ['productid' => $productid]);
+        if (!$record) {
+            return null;
+        }
+        return $this->hydrate($record);
+    }
 }

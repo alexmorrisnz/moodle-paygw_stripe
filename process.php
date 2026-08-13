@@ -23,6 +23,7 @@
  */
 
 use core_payment\helper;
+use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 
 require_once(__DIR__ . '/../../../config.php');
@@ -38,12 +39,14 @@ $sessionid = required_param('session_id', PARAM_TEXT);
 
 $config = (object) helper::get_gateway_configuration($component, $paymentarea, $itemid, 'stripe');
 
+$factory = new stripe_service_factory($config->apikey, $config->secretkey);
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
 $sessionmode = $stripehelper->get_sessionmode($sessionid);
 
 if ($sessionmode === 'subscription') {
-    $subscriptionstatus = $stripehelper->get_subscription_status($sessionid);
+    $subscriptionservice = $factory->subscription_service();
+    $subscriptionstatus = $subscriptionservice->get_subscription_status($sessionid);
     if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
         $stripehelper->save_payment_status($sessionid);
         $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);

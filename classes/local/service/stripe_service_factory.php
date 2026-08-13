@@ -52,4 +52,8 @@ final class stripe_service_factory {
     public function customer_service(): customer_service {
         return new customer_service($this->stripe_client());
     }
+
+    public function subscription_service(): subscription_service {
+        return new subscription_service($this->stripe_client());
+    }
 }

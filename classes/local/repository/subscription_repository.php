@@ -34,4 +34,18 @@ final class subscription_repository extends base_repository {
     protected function model_class(): string {
         return subscription::class;
     }
+
+    /**
+     * Find all subscriptions by Moodle userid.
+     *
+     * @param int $userid
+     * @return array
+     * @throws \dml_exception
+     */
+    public function find_all_by_userid(int $userid): array {
+        global $DB;
+
+        $records = $DB->get_records('paygw_stripe_subscriptions', ['userid' => $userid]);
+        return array_map([$this, 'hydrate'], $records);
+    }
 }

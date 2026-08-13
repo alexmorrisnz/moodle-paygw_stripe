@@ -25,6 +25,7 @@
 define('NO_MOODLE_COOKIES', true);
 
 use core_payment\helper;
+use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
@@ -57,7 +58,7 @@ $metadata = $jsonpayload['data']['object']['metadata'];
 $config =
     (object) helper::get_gateway_configuration($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], 'stripe');
 
-$factory = new \paygw_stripe\local\service\stripe_service_factory($config->apikey, $config->secretkey);
+$factory = new stripe_service_factory($config->apikey, $config->secretkey);
 
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
