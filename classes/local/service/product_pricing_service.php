@@ -30,6 +30,7 @@ use paygw_stripe\local\model\product as paygw_product;
 /**
  * Product pricing service.
  *
+ * @package   paygw_stripe
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

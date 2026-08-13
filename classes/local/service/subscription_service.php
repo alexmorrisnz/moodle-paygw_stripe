@@ -34,6 +34,7 @@ use Stripe\StripeClient;
 /**
  * Subscription service.
  *
+ * @package   paygw_stripe
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

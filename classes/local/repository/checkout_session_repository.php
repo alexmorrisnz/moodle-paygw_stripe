@@ -25,6 +25,7 @@ use paygw_stripe\local\model\checkout_session;
  *
  * @phpcs:ignore moodle.Commenting.ValidTags.Invalid
  * @extends   base_repository<checkout_session>
+ * @package   paygw_stripe
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

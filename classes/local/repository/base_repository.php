@@ -26,6 +26,7 @@ use paygw_stripe\local\model\mappable_model;
  *
  * @phpcs:ignore moodle.Commenting.ValidTags.Invalid
  * @template  T of mappable_model
+ * @package   paygw_stripe
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
