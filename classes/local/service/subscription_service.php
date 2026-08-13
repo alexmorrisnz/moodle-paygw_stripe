@@ -288,6 +288,9 @@ class subscription_service {
             'return_url' => $returnurl->out(),
         ]);
 
+        if (defined('PHPUNIT_TEST') && PHPUNIT_TEST) {
+            return;
+        }
         header("HTTP/1.1 303 See Other");
         header("Location: " . $session->url);
     }
