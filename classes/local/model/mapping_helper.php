@@ -1,0 +1,43 @@
+<?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
+declare(strict_types=1);
+
+namespace paygw_stripe\local\model;
+
+/**
+ * Mapping helper trait. Provides common methods for mapping data.
+ *
+ * @copyright 2026 Alex Morris <alex@navra.nz>
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+trait mapping_helper {
+    protected static function to_nullable_string(mixed $value): ?string {
+        return $value === null ? null : (string)$value;
+    }
+
+    protected static function nullable_string_field(\stdClass $record, string $field): ?string {
+        return property_exists($record, $field) ? self::to_nullable_string($record->{$field}) : null;
+    }
+
+    protected static function to_nullable_int(mixed $value): ?int {
+        return $value === null ? null : (int)$value;
+    }
+
+    protected static function nullable_int_field(\stdClass $record, string $field): ?int {
+        return property_exists($record, $field) ? self::to_nullable_int($record->{$field}) : null;
+    }
+}
