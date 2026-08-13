@@ -16,35 +16,36 @@
 
 declare(strict_types=1);
 
-namespace paygw_stripe\local\repository;
+namespace paygw_stripe\local\service;
 
-use paygw_stripe\local\model\webhook;
+use paygw_stripe\stripe_helper;
+use Stripe\StripeClient;
 
 /**
- * Webhook table repository.
+ * Stripe service factory.
  *
- * @extends   base_repository<webhook>
  * @copyright 2026 Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class webhook_repository extends base_repository {
-    protected function table(): string {
-        return 'paygw_stripe_webhooks';
-    }
-    protected function model_class(): string {
-        return webhook::class;
+final class stripe_service_factory {
+    public function __construct(
+        private string $apikey,
+        private string $secretkey,
+    ) {
     }
 
-    /**
-     * Find a webhook record by paymentaccountid.
-     *
-     * @param int $paymentaccountid
-     * @return webhook|null
-     * @throws \dml_exception
-     */
-    public function find_by_paymentaccountid(int $paymentaccountid): ?webhook {
-        global $DB;
+    private function stripe_client(): StripeClient {
+        return new StripeClient([
+            'api_key' => $this->secretkey,
+            'stripe_version' => stripe_helper::$apiversion,
+        ]);
+    }
 
-        return $DB->get_record($this->table(), ['paymentaccountid' => $paymentaccountid]) ? $this->hydrate($DB->get_record($this->table(), ['paymentaccountid' => $paymentaccountid])) : null;
+    public function webhook_service(): webhook_service {
+        return new webhook_service($this->stripe_client());
+    }
+
+    public function product_pricing_service(): product_pricing_service {
+        return new product_pricing_service($this->stripe_client());
     }
 }

@@ -39,6 +39,9 @@ class product_pricing_service {
      */
     private $stripe;
 
+    /**
+     * @var product_repository The product repository.
+     */
     private $productrepository;
 
     public function __construct(StripeClient $stripe) {

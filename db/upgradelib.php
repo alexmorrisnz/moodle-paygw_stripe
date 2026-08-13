@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 
 use core_payment\account;
+use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 use Stripe\Stripe;
 use Stripe\StripeClient;
@@ -125,9 +126,11 @@ function paygw_stripe_recreate_webhooks() {
                 continue;
             }
             try {
-                $stripehelper = new stripe_helper($config['apikey'], $config['secretkey']);
-                $stripehelper->delete_webhook($account->get('id'));
-                $stripehelper->create_webhook($account->get('id'));
+
+                $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
+                $webhookservice = $factory->webhook_service();
+                $webhookservice->delete_webhook($account->get('id'));
+                $webhookservice->create_webhook($account->get('id'));
             } catch (Exception $ignored) {
                 // Ignore errors, the api keys we are given may be wrong.
                 continue;

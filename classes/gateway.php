@@ -26,6 +26,7 @@ namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
 use Exception;
+use paygw_stripe\local\service\stripe_service_factory;
 
 /**
  * The gateway class for Stripe payment gateway.
@@ -238,12 +239,14 @@ class gateway extends \core_payment\gateway {
 
             try {
                 if (is_string($oldapikey) && $oldapikey !== '' && is_string($oldsecret) && $oldsecret !== '') {
-                    $oldhelper = new stripe_helper($oldapikey, $oldsecret);
-                    $oldhelper->delete_webhook($paymentaccountid);
+                    $factory = new stripe_service_factory($oldapikey, $oldsecret);
+                    $webhookservice = $factory->webhook_service();
+                    $webhookservice->delete_webhook($paymentaccountid);
                 }
 
-                $newhelper = new stripe_helper($newapikey, $newsecret);
-                $newhelper->create_webhook($paymentaccountid);
+                $factory = new stripe_service_factory($newapikey, $newsecret);
+                $webhookservice = $factory->webhook_service();
+                $webhookservice->create_webhook($paymentaccountid);
             } catch (Exception $ignored) {
                 $errors['apikey'] = get_string('apiwebhookerror', 'paygw_stripe');
             }

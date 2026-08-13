@@ -56,6 +56,9 @@ if (
 $metadata = $jsonpayload['data']['object']['metadata'];
 $config =
     (object) helper::get_gateway_configuration($metadata['component'], $metadata['paymentarea'], $metadata['itemid'], 'stripe');
+
+$factory = new \paygw_stripe\local\service\stripe_service_factory($config->apikey, $config->secretkey);
+
 $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
 
 if (!isset($_SERVER['HTTP_STRIPE_SIGNATURE'])) {
@@ -68,7 +71,8 @@ $event = null;
 
 // Validate payload using secret retrieved from webhook table.
 $payable = helper::get_payable($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
-$webhook = $stripehelper->get_webhook($payable->get_account_id());
+$webhookservice = $factory->webhook_service();
+$webhook = $webhookservice->get_webhook($payable->get_account_id());
 if ($webhook == null) {
     http_response_code(500);
     exit();

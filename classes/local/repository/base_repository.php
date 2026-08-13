@@ -77,6 +77,17 @@ abstract class base_repository {
     }
 
     /**
+     * Delete a modal.
+     *
+     * @param mappable_model $model
+     * @return void
+     * @throws \dml_exception
+     */
+    public function delete(mappable_model $model): void {
+        $this->db->delete_records($this->table(), ['id' => $model->id]);
+    }
+
+    /**
      * Hydrate a record into a model.
      *
      * @param \stdClass $record

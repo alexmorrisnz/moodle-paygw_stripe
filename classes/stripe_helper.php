@@ -32,12 +32,12 @@ use DateTime;
 use DateTimeZone;
 use moodle_url;
 use paygw_stripe\local\service\product_pricing_service;
+use paygw_stripe\local\service\stripe_service_factory;
+use paygw_stripe\local\service\webhook_service;
 use Stripe\Checkout\Session;
 use Stripe\Customer;
 use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
-use Stripe\Price;
-use Stripe\Product;
 use Stripe\Stripe;
 use Stripe\StripeClient;
 use Stripe\WebhookEndpoint;
@@ -68,6 +68,7 @@ class stripe_helper {
     public static $apiversion = '2025-06-30.basil';
 
     private product_pricing_service $productpricingservice;
+    private webhook_service $webhookservice;
 
     /**
      * Initialise the Stripe API client.
@@ -75,7 +76,11 @@ class stripe_helper {
      * @param string $apikey
      * @param string $secretkey
      */
-    public function __construct(string $apikey, string $secretkey) {
+    public function __construct(
+        string $apikey,
+        string $secretkey,
+        ?stripe_service_factory $factory = null
+    ) {
         $this->apikey = $apikey;
         $this->stripe = new StripeClient([
             'api_key' => $secretkey,
@@ -87,7 +92,12 @@ class stripe_helper {
             'https://github.com/alexmorrisnz/moodle-paygw_stripe'
         );
 
-        $this->productpricingservice = new product_pricing_service($this->stripe);
+        if ($factory === null) {
+            $factory = new stripe_service_factory($apikey, $secretkey);
+        }
+
+        $this->productpricingservice = $factory->product_pricing_service();
+        $this->webhookservice = $factory->webhook_service();
     }
 
     /**
@@ -243,7 +253,7 @@ class stripe_helper {
         global $CFG, $USER;
 
         // Ensure webhook exists before we potentially use it.
-        $this->create_webhook($payable->get_account_id());
+        $this->webhookservice->create_webhook($payable->get_account_id());
 
         [$product, $price] = $this->productpricingservice->create_product_and_price(
             $config,
@@ -352,7 +362,7 @@ class stripe_helper {
         global $CFG, $USER;
 
         // Ensure webhook exists before we use it.
-        $this->create_webhook($payable->get_account_id());
+        $this->webhookservice->create_webhook($payable->get_account_id());
 
         $pricedetails = $this->get_subscription_config_price_details($config);
 
@@ -618,88 +628,6 @@ class stripe_helper {
             'stripe'
         );
         helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $userid);
-    }
-
-    /**
-     * Find and return webhook endpoint if it exists.
-     * Retrieve secret from Moodle database and add to webhook object.
-     *
-     * @param int $paymentaccountid
-     * @return WebhookEndpoint|null
-     * @throws ApiErrorException|\dml_exception
-     */
-    public function get_webhook(int $paymentaccountid): ?WebhookEndpoint {
-        global $DB;
-
-        if (!($record = $DB->get_record('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]))) {
-            return null;
-        }
-
-        if ($webhook = $this->stripe->webhookEndpoints->retrieve($record->webhookid)) {
-            // Webhook still exists, lets set the secret and return.
-            $webhook->secret = $record->secret;
-            return $webhook;
-        }
-
-        return null;
-    }
-
-    /**
-     * Create webhook for given account id if none already exists.
-     *
-     * @param int $paymentaccountid
-     * @return bool True if webhook was created
-     * @throws ApiErrorException
-     * @throws \dml_exception
-     */
-    public function create_webhook(int $paymentaccountid): bool {
-        global $CFG, $DB;
-
-        if ($this->get_webhook($paymentaccountid) != null) {
-            return false;
-        }
-
-        $webhook = $this->stripe->webhookEndpoints->create([
-            'url' => $CFG->wwwroot . '/payment/gateway/stripe/webhook.php',
-            'enabled_events' => [
-                'checkout.session.completed',
-                'checkout.session.async_payment_succeeded',
-                'checkout.session.async_payment_failed',
-                'customer.subscription.deleted',
-                'customer.subscription.updated',
-            ],
-            'api_version' => self::$apiversion,
-        ]);
-
-        $datum = new \stdClass();
-        $datum->paymentaccountid = $paymentaccountid;
-        $datum->webhookid = $webhook->id;
-        $datum->secret = $webhook->secret;
-        $DB->insert_record('paygw_stripe_webhooks', $datum);
-
-        return true;
-    }
-
-    /**
-     * Delete a webhook record in the database and it's associated Stripe endpoint.
-     *
-     * @param int $paymentaccountid
-     * @return bool
-     * @throws ApiErrorException
-     * @throws \dml_exception
-     */
-    public function delete_webhook(int $paymentaccountid): bool {
-        global $DB;
-
-        if (!($record = $DB->get_record('paygw_stripe_webhooks', ['paymentaccountid' => $paymentaccountid]))) {
-            return false;
-        }
-
-        $DB->delete_records('paygw_stripe_webhooks', ['paymentaccountid' => $record->paymentaccountid]);
-
-        $this->stripe->webhookEndpoints->delete($record->webhookid);
-
-        return true;
     }
 
     /**
