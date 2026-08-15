@@ -21,6 +21,10 @@ namespace paygw_stripe\local\service;
 use paygw_stripe\stripe_helper;
 use Stripe\StripeClient;
 
+defined('MOODLE_INTERNAL') || die();
+
+require_once(__DIR__ . '/../../../.extlib/stripe-php/init.php');
+
 /**
  * Stripe service factory.
  *
@@ -102,5 +106,14 @@ final class stripe_service_factory {
      */
     public function checkout_service(): checkout_service {
         return new checkout_service($this->stripe_client());
+    }
+
+    /**
+     * Create a new payment method config service.
+     *
+     * @return payment_method_config_service
+     */
+    public function payment_method_config_service(): payment_method_config_service {
+        return new payment_method_config_service($this->stripe_client());
     }
 }

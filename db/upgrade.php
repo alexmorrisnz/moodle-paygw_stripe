@@ -266,5 +266,10 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081500, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2026081501) {
+        paygw_stripe_move_payment_methods();
+        upgrade_plugin_savepoint(true, 2026081501, 'paygw', 'stripe');
+    }
+
     return true;
 }

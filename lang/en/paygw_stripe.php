@@ -83,6 +83,9 @@ $string['paymentmethod:sepa_debit'] = 'SEPA Direct Debit';
 $string['paymentmethod:twint'] = 'TWINT';
 $string['paymentmethod:wechat_pay'] = 'WeChat Pay';
 
+$string['paymentmethodconfiguration'] = 'Payment Method Configuration';
+$string['paymentmethodconfiguration_help'] = 'Select a Stripe Payment Method configuration to use for this gateway. Update your payment methods in the Stripe dashboard.';
+$string['paymentmethodconfigurationsavekeysfirst'] = 'Save your Stripe API keys first, then select a payment method configuration.';
 $string['paymentmethods'] = 'Payment Methods';
 $string['paymentpending'] = 'Payment is pending, you will be enrolled when the payment has cleared.';
 $string['paymentsuccessful'] = 'Payment was successful';

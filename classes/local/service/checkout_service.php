@@ -61,6 +61,10 @@ class checkout_service {
      * @var subscription_service The subscription service.
      */
     private subscription_service $subscriptionservice;
+    /**
+     * @var payment_method_config_service The payment method configuration service.
+     */
+    private payment_method_config_service $paymentmethodconfigservice;
 
     /**
      * Checkout service constructor.
@@ -76,6 +80,7 @@ class checkout_service {
         $this->localeservice = new locale_service();
         $this->webhookservice = new webhook_service($stripe);
         $this->subscriptionservice = new subscription_service($stripe);
+        $this->paymentmethodconfigservice = new payment_method_config_service($stripe);
     }
 
     /**
@@ -123,13 +128,18 @@ class checkout_service {
 
         $stripelocale = $this->localeservice->get_stripe_locale_for_user($USER);
 
+        $paymentmethodconfigurationid = $config->paymentmethodconfiguration;
+        if ($paymentmethodconfigurationid == null) {
+            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->create_payment_method_config($config->name);
+        }
+
         $session = $this->stripe->checkout->sessions->create([
             'success_url' => $CFG->wwwroot . '/payment/gateway/stripe/process.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid . '&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
             'locale' => $stripelocale,
-            'payment_method_types' => $config->paymentmethods,
+            'payment_method_configuration' => $paymentmethodconfigurationid,
             'payment_method_options' => [
                 'wechat_pay' => [
                     'client' => "web",

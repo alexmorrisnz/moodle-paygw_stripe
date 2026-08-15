@@ -68,6 +68,10 @@ class subscription_service {
      * @var webhook_service The webhook service.
      */
     private webhook_service $webhookservice;
+    /**
+     * @var payment_method_config_service The payment method config service.
+     */
+    private payment_method_config_service $paymentmethodconfigservice;
 
     /**
      * Subscription service constructor.
@@ -84,6 +88,7 @@ class subscription_service {
         $this->customerservice = new customer_service($stripe);
         $this->localeservice = new locale_service();
         $this->webhookservice = new webhook_service($stripe);
+        $this->paymentmethodconfigservice = new payment_method_config_service($stripe);
     }
 
     /**
@@ -204,6 +209,11 @@ class subscription_service {
 
         $stripelocale = $this->localeservice->get_stripe_locale_for_user($USER);
 
+        $paymentmethodconfigurationid = $config->paymentmethodconfiguration;
+        if ($paymentmethodconfigurationid == null) {
+            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->create_payment_method_config($config->name);
+        }
+
         $subscriptiondata = [
             'metadata' => [
                 'userid' => $USER->id,
@@ -232,7 +242,7 @@ class subscription_service {
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
             'locale' => $stripelocale,
-            'payment_method_types' => $config->paymentmethods,
+            'payment_method_configuration' => $paymentmethodconfigurationid,
             'mode' => 'subscription',
             'line_items' => [[
                 'price' => $price,
