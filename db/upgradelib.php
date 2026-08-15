@@ -163,12 +163,11 @@ function paygw_stripe_move_payment_methods() {
                 if (empty($paymentmethods)) {
                     continue;
                 }
-                // Create stripe payment method configuration
+                // Create stripe payment method configuration.
                 $configid = $paymentmethodservice->create_payment_method_config($account->get_formatted_name(), $paymentmethods);
 
                 // Update payment account setting to use stripe payment method configuration.
                 $config['paymentmethodconfiguration'] = $configid;
-                // unset($config['paymentmethods']);
                 $gateway->set('config', json_encode($config));
                 $gateway->update();
             } catch (Exception $ignored) {
