@@ -85,6 +85,7 @@ $string['paymentmethod:wechat_pay'] = 'WeChat Pay';
 
 $string['paymentmethodconfiguration'] = 'Payment Method Configuration';
 $string['paymentmethodconfiguration_help'] = 'Select a Stripe Payment Method configuration to use for this gateway. Update your payment methods in the Stripe dashboard.';
+$string['paymentmethodconfigurationlink'] = 'Manage your payment methods on the <a href="https://dashboard.stripe.com/settings/payment_methods">Stripe dashboard settings page</a>.';
 $string['paymentmethodconfigurationsavekeysfirst'] = 'Save your Stripe API keys first, then select a payment method configuration.';
 $string['paymentmethods'] = 'Payment Methods';
 $string['paymentpending'] = 'Payment is pending, you will be enrolled when the payment has cleared.';

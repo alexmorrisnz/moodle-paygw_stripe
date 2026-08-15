@@ -109,6 +109,7 @@ class gateway extends \core_payment\gateway {
                 $options
             );
             $mform->addHelpButton('paymentmethodconfiguration', 'paymentmethodconfiguration', 'paygw_stripe');
+            $mform->addElement('static', 'paymentmethodconfigurationlink', '', get_string('paymentmethodconfigurationlink', 'paygw_stripe'));
         } else {
             $mform->addElement(
                 'static',
