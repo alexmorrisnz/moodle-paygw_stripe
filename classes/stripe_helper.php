@@ -61,7 +61,7 @@ class stripe_helper {
     /**
      * @var string Stripe API version set explicitly in Stripe client.
      */
-    public static $apiversion = '2025-06-30.basil';
+    public static $apiversion = '2026-07-29.dahlia';
 
     /**
      * @var product_pricing_service Service for managing Stripe products and prices.
