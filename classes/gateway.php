@@ -97,8 +97,9 @@ class gateway extends \core_payment\gateway {
                 foreach ($configs as $config) {
                     $options[$config->id] = $config->name . ' (' . $config->id . ')';
                 }
-            } catch (Exception $ignored) {
+            } catch (Exception $e) {
                 // Ignored, we don't want to break the form if we can't connect to Stripe.
+                debugging('Could not fetch Stripe payment method configurations: ' . $e->getMessage(), DEBUG_DEVELOPER);
             }
         }
         if ($options) {
