@@ -27,7 +27,7 @@ $string['alreadydeliveredcourse'] = 'This course is already delivered to you, if
 $string['anchoredbilling'] = 'Use the start of the subscription interval as a fixed billing date.';
 $string['anchoredbilling_help'] =
     'E.g. For a monthly subscription, billing will be done every 1st of the month. If a user subscribes in the middle of the month, they will be charged a prorated amount covering from the registration day to the end of the month';
-$string['apikey'] = 'API Key';
+$string['apikey'] = 'Publishable Key';
 $string['apikey_help'] = 'The API key that we use to identifier ourselves with Stripe';
 $string['apiwebhookerror'] = 'There was an error while creating a webhook using the given API keys.';
 $string['cancel'] = 'Cancel';
