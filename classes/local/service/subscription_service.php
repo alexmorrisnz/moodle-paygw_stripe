@@ -211,7 +211,8 @@ class subscription_service {
 
         $paymentmethodconfigurationid = $config->paymentmethodconfiguration;
         if ($paymentmethodconfigurationid == null) {
-            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->create_payment_method_config($config->name);
+            $account = new \core_payment\account($payable->get_account_id());
+            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->create_payment_method_config($account->get('name'));
         }
 
         $subscriptiondata = [
