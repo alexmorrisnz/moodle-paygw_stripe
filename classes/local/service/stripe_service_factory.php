@@ -29,7 +29,7 @@ require_once(__DIR__ . '/../../../.extlib/stripe-php/init.php');
  * Stripe service factory.
  *
  * @package   paygw_stripe
- * @copyright 2026 Alex Morris <alex@navra.nz>
+ * @copyright Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class stripe_service_factory {

@@ -18,7 +18,7 @@
  * Webhook for receiving events from Stripe.
  *
  * @package    paygw_stripe
- * @copyright  2023 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

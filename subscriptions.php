@@ -18,8 +18,7 @@
  * Subscription list page.
  *
  * @package    paygw_stripe
- * @author     Alex Morris <alex@navra.nz>
- * @copyright  2023 Catalyst IT
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

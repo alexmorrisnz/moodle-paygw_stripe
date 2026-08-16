@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Contains class for Stripe payment gateway.
- *
- * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
 namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
@@ -31,7 +23,7 @@ use paygw_stripe\local\service\stripe_service_factory;
 /**
  * The gateway class for Stripe payment gateway.
  *
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gateway extends \core_payment\gateway {

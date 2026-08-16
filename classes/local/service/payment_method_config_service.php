@@ -24,7 +24,7 @@ use Stripe\StripeClient;
  * Payment Method Configuration service.
  *
  * @package   paygw_stripe
- * @copyright 2026 Alex Morris <alex@navra.nz>
+ * @copyright Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class payment_method_config_service {

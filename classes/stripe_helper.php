@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Various helper methods for interacting with the Stripe API
- *
- * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
 namespace paygw_stripe;
 
 use core_payment\helper;
@@ -45,7 +37,7 @@ require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 /**
  * The helper class for Stripe payment gateway.
  *
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class stripe_helper {

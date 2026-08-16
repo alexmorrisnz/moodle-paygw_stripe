@@ -22,7 +22,7 @@ namespace paygw_stripe\local\model;
  * Checkout session model.
  *
  * @package   paygw_stripe
- * @copyright 2026 Alex Morris <alex@navra.nz>
+ * @copyright Alex Morris <alex@navra.nz>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class checkout_session implements mappable_model {
