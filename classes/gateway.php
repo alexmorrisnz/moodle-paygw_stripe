@@ -227,7 +227,7 @@ class gateway extends \core_payment\gateway {
         array &$errors
     ): void {
         global $DB;
-        if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
+        if ($data->enabled && (empty($data->apikey) || empty($data->secretkey))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
         }
 
