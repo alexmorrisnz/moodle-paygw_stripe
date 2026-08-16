@@ -13,27 +13,16 @@ Provides a payment gateway with Stripe in Moodle
 
 ## Details
 
+Stripe offers over 135 currencies, and many payment methods including cards, bank transfer, Apple Pay, SEPA, and more. The plugin supports all of the payment methods that your Stripe account is configured to use.
+
 Stripe offers 106+ currencies however certain payment gateways only support a subset of those.  
 E.g. Alipay only supports CNY and NZD currencies.
 
 The plugin supports using promotion/coupon codes and automatic tax calculation.
 
-This plugin can be used with these payment gateways:
+## Support
 
-* Card
-* Alipay
-* Bancontact
-* EPS
-* giropay
-* iDEAL
-* P24
-* SEPA Direct Debit
-* UPI
-* Klarna
-* New Zealand BECS Direct Debit
-* PayPal
-
-Some of those payment gateways will only work in Stripe if you have provided additional verification details.
+Create an issue on the [GitHub repository](https://github.com/alexmorrisnz/moodle-paygw_stripe/issues), or email contact@navra.nz.
 
 ## Warm Thanks
 
