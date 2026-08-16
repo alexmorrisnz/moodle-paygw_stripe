@@ -148,4 +148,22 @@ class payment_method_config_service {
     public function list_payment_method_configs(): array {
         return $this->stripe->paymentMethodConfigurations->all(['active' => true])->data;
     }
+
+    /**
+     * Get the default payment method configuration ID.
+     *
+     * @return string|null
+     * @throws \Stripe\Exception\ApiErrorException
+     */
+    public function get_default_payment_method_config_id(): ?string {
+        $configs = $this->stripe->paymentMethodConfigurations->all(['active' => true])->data;
+
+        foreach ($configs as $config) {
+            if (!empty($config->is_default)) {
+                return $config->id;
+            }
+        }
+
+        return null;
+    }
 }

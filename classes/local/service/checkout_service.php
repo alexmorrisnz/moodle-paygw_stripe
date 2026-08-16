@@ -130,8 +130,7 @@ class checkout_service {
 
         $paymentmethodconfigurationid = $config->paymentmethodconfiguration;
         if ($paymentmethodconfigurationid == null) {
-            $account = new \core_payment\account($payable->get_account_id());
-            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->create_payment_method_config($account->get('name'));
+            $paymentmethodconfigurationid = $this->paymentmethodconfigservice->get_default_payment_method_config_id();
         }
 
         $session = $this->stripe->checkout->sessions->create([
