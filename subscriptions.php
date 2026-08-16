@@ -18,12 +18,14 @@
  * Subscription list page.
  *
  * @package    paygw_stripe
- * @author     Alex Morris <alex@navra.nz>
- * @copyright  2023 Catalyst IT
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 use core_payment\helper;
+use paygw_stripe\local\repository\product_repository;
+use paygw_stripe\local\repository\subscription_repository;
+use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 
 require('../../../config.php');
@@ -38,17 +40,27 @@ $PAGE->set_context(context_system::instance());
 $PAGE->set_title(get_string('subscriptions', 'paygw_stripe'));
 $PAGE->set_heading(get_string('subscriptions', 'paygw_stripe'));
 
+$repo = new subscription_repository();
+$productrepo = new product_repository();
+
 if ($subid != null) {
-    $subscription = $DB->get_record('paygw_stripe_subscriptions', ['id' => $subid, 'userid' => $USER->id], '*', MUST_EXIST);
-    $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
+    $subscription = $repo->find_by_id($subid);
+    if (!$subscription || $subscription->userid !== $USER->id) {
+        throw new \moodle_exception('subscriptioninvalid', 'paygw_stripe');
+    }
+
+    $product = $productrepo->find_by_productid($subscription->productid);
+
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');
-    $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
+
+    $factory = new stripe_service_factory($config->apikey, $config->secretkey);
+    $subscriptionservice = $factory->subscription_service();
 
     if ($action == 'cancel') {
-        $stripehelper->cancel_subscription($subscription);
+        $subscriptionservice->cancel_subscription($subscription);
         redirect(new moodle_url('/payment/gateway/stripe/subscriptions.php'));
     } else if ($action == 'portal') {
-        $stripehelper->load_portal($subscription);
+        $subscriptionservice->load_portal($subscription);
     }
 }
 
@@ -70,19 +82,20 @@ $table->head = [
     '',
 ];
 
-$subscriptions = $DB->get_records('paygw_stripe_subscriptions', ['userid' => $USER->id]);
+$subscriptions = $repo->find_all_by_userid($USER->id);
 
 $table->data = [];
 
 foreach ($subscriptions as $subscription) {
-    $product = $DB->get_record('paygw_stripe_products', ['productid' => $subscription->productid]);
+    $product = $productrepo->find_by_productid($subscription->productid);
     // Switching API keys can lead to products in the Moodle DB not matching what exists in Stripe, ignore and move on.
     if ($product == null) {
         continue;
     }
     $config = (object) helper::get_gateway_configuration($product->component, $product->paymentarea, $product->itemid, 'stripe');
-    $stripehelper = new stripe_helper($config->apikey, $config->secretkey);
-    $row = $stripehelper->get_subscription_table_data($subscription);
+    $factory = new stripe_service_factory($config->apikey, $config->secretkey);
+    $subscriptionservice = $factory->subscription_service();
+    $row = $subscriptionservice->get_subscription_table_data($subscription);
     if ($row != null) {
         $table->data[] = $row;
     }

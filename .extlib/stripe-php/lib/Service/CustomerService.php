@@ -32,7 +32,7 @@ class CustomerService extends AbstractService
      * href="/docs/billing/customer/balance">balances</a>.
      *
      * @param string $parentId
-     * @param null|array{ending_before?: string, expand?: string[], limit?: int, starting_after?: string} $params
+     * @param null|array{created?: array|int, ending_before?: string, expand?: string[], invoice?: string, limit?: int, starting_after?: string} $params
      * @param null|RequestOptionsArray|\Stripe\Util\RequestOptions $opts
      *
      * @return \Stripe\Collection<\Stripe\CustomerBalanceTransaction>
@@ -112,7 +112,7 @@ class CustomerService extends AbstractService
     /**
      * Creates a new customer object.
      *
-     * @param null|array{address?: null|array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, balance?: int, cash_balance?: array{settings?: array{reconciliation_mode?: string}}, description?: string, email?: string, expand?: string[], invoice_prefix?: string, invoice_settings?: array{custom_fields?: null|array{name: string, value: string}[], default_payment_method?: string, footer?: string, rendering_options?: null|array{amount_tax_display?: null|string, template?: string}}, metadata?: null|array<string, string>, name?: string, next_invoice_sequence?: int, payment_method?: string, phone?: string, preferred_locales?: string[], shipping?: null|array{address: array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, name: string, phone?: string}, source?: string, tax?: array{ip_address?: null|string, validate_location?: string}, tax_exempt?: null|string, tax_id_data?: array{type: string, value: string}[], test_clock?: string, validate?: bool} $params
+     * @param null|array{address?: null|array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, balance?: int, business_name?: null|string, cash_balance?: array{settings?: array{reconciliation_mode?: string}}, description?: string, email?: string, expand?: string[], individual_name?: null|string, invoice_prefix?: string, invoice_settings?: array{custom_fields?: null|array{name: string, value: string}[], default_payment_method?: string, footer?: string, rendering_options?: null|array{amount_tax_display?: null|string, template?: string}}, metadata?: null|array<string, string>, name?: string, next_invoice_sequence?: int, payment_method?: string, phone?: string, preferred_locales?: string[], shipping?: null|array{address: array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, name: string, phone?: string}, source?: string, tax?: array{ip_address?: null|string, validate_location?: string}, tax_exempt?: null|string, tax_id_data?: array{type: string, value: string}[], test_clock?: string, validate?: bool} $params
      * @param null|RequestOptionsArray|\Stripe\Util\RequestOptions $opts
      *
      * @return \Stripe\Customer
@@ -167,7 +167,7 @@ class CustomerService extends AbstractService
      *
      * If the card’s owner has no default card, then the new card will become the
      * default. However, if the owner already has a default, then it will not change.
-     * To change the default, you should <a href="/docs/api#update_customer">update the
+     * To change the default, you should <a href="/api/customers/update">update the
      * customer</a> to have a new <code>default_source</code>.
      *
      * @param string $parentId
@@ -407,21 +407,21 @@ class CustomerService extends AbstractService
 
     /**
      * Updates the specified customer by setting the values of the parameters passed.
-     * Any parameters not provided will be left unchanged. For example, if you pass the
+     * Any parameters not provided are left unchanged. For example, if you pass the
      * <strong>source</strong> parameter, that becomes the customer’s active source
-     * (e.g., a card) to be used for all charges in the future. When you update a
+     * (such as a card) to be used for all charges in the future. When you update a
      * customer to a new valid card source by passing the <strong>source</strong>
      * parameter: for each of the customer’s current subscriptions, if the subscription
      * bills automatically and is in the <code>past_due</code> state, then the latest
-     * open invoice for the subscription with automatic collection enabled will be
-     * retried. This retry will not count as an automatic retry, and will not affect
-     * the next regularly scheduled payment for the invoice. Changing the
-     * <strong>default_source</strong> for a customer will not trigger this behavior.
+     * open invoice for the subscription with automatic collection enabled is retried.
+     * This retry doesn’t count as an automatic retry, and doesn’t affect the next
+     * regularly scheduled payment for the invoice. Changing the
+     * <strong>default_source</strong> for a customer doesn’t trigger this behavior.
      *
      * This request accepts mostly the same arguments as the customer creation call.
      *
      * @param string $id
-     * @param null|array{address?: null|array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, balance?: int, cash_balance?: array{settings?: array{reconciliation_mode?: string}}, default_source?: string, description?: string, email?: string, expand?: string[], invoice_prefix?: string, invoice_settings?: array{custom_fields?: null|array{name: string, value: string}[], default_payment_method?: string, footer?: string, rendering_options?: null|array{amount_tax_display?: null|string, template?: string}}, metadata?: null|array<string, string>, name?: string, next_invoice_sequence?: int, phone?: string, preferred_locales?: string[], shipping?: null|array{address: array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, name: string, phone?: string}, source?: string, tax?: array{ip_address?: null|string, validate_location?: string}, tax_exempt?: null|string, validate?: bool} $params
+     * @param null|array{address?: null|array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, balance?: int, business_name?: null|string, cash_balance?: array{settings?: array{reconciliation_mode?: string}}, default_source?: string, description?: string, email?: string, expand?: string[], individual_name?: null|string, invoice_prefix?: string, invoice_settings?: array{custom_fields?: null|array{name: string, value: string}[], default_payment_method?: string, footer?: string, rendering_options?: null|array{amount_tax_display?: null|string, template?: string}}, metadata?: null|array<string, string>, name?: string, next_invoice_sequence?: int, phone?: string, preferred_locales?: string[], shipping?: null|array{address: array{city?: string, country?: string, line1?: string, line2?: string, postal_code?: string, state?: string}, name: string, phone?: string}, source?: string, tax?: array{ip_address?: null|string, validate_location?: string}, tax_exempt?: null|string, validate?: bool} $params
      * @param null|RequestOptionsArray|\Stripe\Util\RequestOptions $opts
      *
      * @return \Stripe\Customer

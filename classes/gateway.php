@@ -14,23 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Contains class for Stripe payment gateway.
- *
- * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
 namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
 use Exception;
+use paygw_stripe\local\service\stripe_service_factory;
 
 /**
  * The gateway class for Stripe payment gateway.
  *
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @package    paygw_stripe
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gateway extends \core_payment\gateway {
@@ -87,25 +81,44 @@ class gateway extends \core_payment\gateway {
         $mform->setType('secretkey', PARAM_TEXT);
         $mform->addHelpButton('secretkey', 'secretkey', 'paygw_stripe');
 
-        $paymentmethods = [
-            'card' => get_string('paymentmethod:card', 'paygw_stripe'),
-            'alipay' => get_string('paymentmethod:alipay', 'paygw_stripe'),
-            'bancontact' => get_string('paymentmethod:bancontact', 'paygw_stripe'),
-            'eps' => get_string('paymentmethod:eps', 'paygw_stripe'),
-            'giropay' => get_string('paymentmethod:giropay', 'paygw_stripe'),
-            'ideal' => get_string('paymentmethod:ideal', 'paygw_stripe'),
-            'p24' => get_string('paymentmethod:p24', 'paygw_stripe'),
-            'sepa_debit' => get_string('paymentmethod:sepa_debit', 'paygw_stripe'),
-            'wechat_pay' => get_string('paymentmethod:wechat_pay', 'paygw_stripe'),
-            'klarna' => get_string('paymentmethod:klarna', 'paygw_stripe'),
-            'nz_bank_account' => get_string('paymentmethod:nz_bank_account', 'paygw_stripe'),
-            'twint' => get_string('paymentmethod:twint', 'paygw_stripe'),
-            'paypal' => get_string('paymentmethod:paypal', 'paygw_stripe'),
-        ];
-        $method = $mform->addElement('select', 'paymentmethods', get_string('paymentmethods', 'paygw_stripe'), $paymentmethods);
-        $mform->setType('paymentmethods', PARAM_TEXT);
-        $mform->setDefault('paymentmethods', 'card');
-        $method->setMultiple(true);
+        $existing = $form->get_gateway_persistent()->get_configuration();
+        $options  = [];
+        if (!empty($existing['apikey']) && !empty($existing['secretkey'])) {
+            try {
+                $factory = new stripe_service_factory($existing['apikey'], $existing['secretkey']);
+                $configs = $factory->payment_method_config_service()->list_payment_method_configs();
+                foreach ($configs as $config) {
+                    $options[$config->id] = $config->name . ' (' . $config->id . ')';
+                }
+            } catch (Exception $e) {
+                // Ignored, we don't want to break the form if we can't connect to Stripe.
+                debugging('Could not fetch Stripe payment method configurations: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            }
+        }
+        if ($options) {
+            $mform->addElement(
+                'select',
+                'paymentmethodconfiguration',
+                get_string('paymentmethodconfiguration', 'paygw_stripe'),
+                $options
+            );
+            $mform->addHelpButton('paymentmethodconfiguration', 'paymentmethodconfiguration', 'paygw_stripe');
+            $mform->addElement(
+                'static',
+                'paymentmethodconfigurationlink',
+                '',
+                get_string('paymentmethodconfigurationlink', 'paygw_stripe')
+            );
+        } else {
+            $mform->addElement(
+                'static',
+                'paymentmethodconfiguration_info',
+                '',
+                get_string('paymentmethodconfigurationsavekeysfirst', 'paygw_stripe')
+            );
+            $mform->addElement('hidden', 'paymentmethodconfiguration');
+            $mform->setType('paymentmethodconfiguration', PARAM_ALPHANUMEXT);
+        }
 
         $mform->addElement('advcheckbox', 'allowpromotioncodes', get_string('allowpromotioncodes', 'paygw_stripe'));
         $mform->setDefault('allowpromotioncodes', true);
@@ -214,7 +227,7 @@ class gateway extends \core_payment\gateway {
         array &$errors
     ): void {
         global $DB;
-        if ($data->enabled && (empty($data->apikey) || empty($data->secretkey) || empty($data->paymentmethods))) {
+        if ($data->enabled && (empty($data->apikey) || empty($data->secretkey))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
         }
 
@@ -238,12 +251,14 @@ class gateway extends \core_payment\gateway {
 
             try {
                 if (is_string($oldapikey) && $oldapikey !== '' && is_string($oldsecret) && $oldsecret !== '') {
-                    $oldhelper = new stripe_helper($oldapikey, $oldsecret);
-                    $oldhelper->delete_webhook($paymentaccountid);
+                    $factory = new stripe_service_factory($oldapikey, $oldsecret);
+                    $webhookservice = $factory->webhook_service();
+                    $webhookservice->delete_webhook($paymentaccountid);
                 }
 
-                $newhelper = new stripe_helper($newapikey, $newsecret);
-                $newhelper->create_webhook($paymentaccountid);
+                $factory = new stripe_service_factory($newapikey, $newsecret);
+                $webhookservice = $factory->webhook_service();
+                $webhookservice->create_webhook($paymentaccountid);
             } catch (Exception $ignored) {
                 $errors['apikey'] = get_string('apiwebhookerror', 'paygw_stripe');
             }

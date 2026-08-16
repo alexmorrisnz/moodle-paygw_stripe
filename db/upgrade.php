@@ -18,7 +18,7 @@
  * Upgrade script for paygw_stripe.
  *
  * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -258,6 +258,17 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         // API version upgrade in last update, but I forgot to recreate webhooks.
         paygw_stripe_recreate_webhooks();
         upgrade_plugin_savepoint(true, 2025080300, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026081500) {
+        // API version upgrade.
+        paygw_stripe_recreate_webhooks();
+        upgrade_plugin_savepoint(true, 2026081500, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026081501) {
+        paygw_stripe_move_payment_methods();
+        upgrade_plugin_savepoint(true, 2026081501, 'paygw', 'stripe');
     }
 
     return true;

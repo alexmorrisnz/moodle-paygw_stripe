@@ -18,11 +18,12 @@
  * Redirects to the stripe checkout for payment
  *
  * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 use core_payment\helper;
+use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 
 require_once(__DIR__ . '/../../../config.php');
@@ -42,9 +43,10 @@ $surcharge = helper::get_gateway_surcharge('stripe');
 
 $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), $surcharge);
 
-$stripehelper = new stripe_helper($config->apikey, $config->secretkey);
+$factory = new stripe_service_factory($config->apikey, $config->secretkey);
 if (!isset($config->type) || $config->type == 'onetime') {
-    $sessionid = $stripehelper->generate_payment(
+    $checkoutservice = $factory->checkout_service();
+    $sessionid = $checkoutservice->generate_payment(
         $config,
         $payable,
         $description,
@@ -54,15 +56,15 @@ if (!isset($config->type) || $config->type == 'onetime') {
         $itemid
     );
 } else {
-    $sessionid = $stripehelper->generate_subscription(
+    $subscriptionservice = $factory->subscription_service();
+    $sessionid = $subscriptionservice->generate_subscription(
         $config,
         $payable,
         $description,
         $cost,
         $component,
         $paymentarea,
-        $itemid,
-        $sessionid
+        $itemid
     );
     if ($sessionid == null) {
         redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));

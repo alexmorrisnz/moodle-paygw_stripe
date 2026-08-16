@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Privacy Subsystem implementation for paygw_stripe.
- *
- * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
 namespace paygw_stripe\privacy;
 
 use core_privacy\local\metadata\collection;
@@ -29,7 +21,8 @@ use core_privacy\local\metadata\collection;
 /**
  * Privacy Subsystem implementation for paygw_stripe.
  *
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @package    paygw_stripe
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\data_provider {

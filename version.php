@@ -18,14 +18,14 @@
  * Version information
  *
  * @package    paygw_stripe
- * @copyright  2021 Alex Morris <alex@navra.nz>
+ * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026071300;        // The current plugin version (Date: YYYYMMDDXX).
-$plugin->release   = '1.34';
+$plugin->version   = 2026081600;        // The current plugin version (Date: YYYYMMDDXX).
+$plugin->release   = 2026081600;
 $plugin->requires  = 2022112809;        // Requires this Moodle version. 4.1.
 $plugin->component = 'paygw_stripe';    // Full name of the plugin (used for diagnostics).
 $plugin->maturity  = MATURITY_STABLE;
