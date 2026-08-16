@@ -37,6 +37,7 @@ require_once(__DIR__ . '/../.extlib/stripe-php/init.php');
 /**
  * The helper class for Stripe payment gateway.
  *
+ * @package    paygw_stripe
  * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

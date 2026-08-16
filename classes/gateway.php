@@ -23,6 +23,7 @@ use paygw_stripe\local\service\stripe_service_factory;
 /**
  * The gateway class for Stripe payment gateway.
  *
+ * @package    paygw_stripe
  * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

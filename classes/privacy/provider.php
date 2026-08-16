@@ -21,6 +21,7 @@ use core_privacy\local\metadata\collection;
 /**
  * Privacy Subsystem implementation for paygw_stripe.
  *
+ * @package    paygw_stripe
  * @copyright  Alex Morris <alex@navra.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
