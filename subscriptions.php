@@ -26,7 +26,6 @@ use core_payment\helper;
 use paygw_stripe\local\repository\product_repository;
 use paygw_stripe\local\repository\subscription_repository;
 use paygw_stripe\local\service\stripe_service_factory;
-use paygw_stripe\stripe_helper;
 
 require('../../../config.php');
 
@@ -45,7 +44,7 @@ $productrepo = new product_repository();
 
 if ($subid != null) {
     $subscription = $repo->find_by_id($subid);
-    if (!$subscription || $subscription->userid !== $USER->id) {
+    if (!$subscription || $subscription->userid !== (int)$USER->id) {
         throw new \moodle_exception('subscriptioninvalid', 'paygw_stripe');
     }
 
@@ -82,7 +81,7 @@ $table->head = [
     '',
 ];
 
-$subscriptions = $repo->find_all_by_userid($USER->id);
+$subscriptions = $repo->find_all_by_userid((int)$USER->id);
 
 $table->data = [];
 
