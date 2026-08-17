@@ -139,6 +139,7 @@ class checkout_service {
             'cancel_url' => $CFG->wwwroot . '/payment/gateway/stripe/cancelled.php?component=' . $component . '&paymentarea=' .
                 $paymentarea . '&itemid=' . $itemid,
             'locale' => $stripelocale,
+            'managed_payments' => ['enabled' => false],
             'payment_method_configuration' => $paymentmethodconfigurationid,
             'payment_method_options' => [
                 'wechat_pay' => [
