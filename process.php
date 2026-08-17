@@ -50,7 +50,7 @@ if ($sessionmode === 'subscription') {
     $subscriptionstatus = $subscriptionservice->get_subscription_status($sessionid);
     if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
         $checkoutservice->save_payment_status($sessionid);
-        $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
+        $stripehelper->deliver_course($component, $paymentarea, $itemid, (int)$USER->id);
 
         // Find redirection.
         $url = helper::get_success_url($component, $paymentarea, $itemid);
@@ -66,7 +66,7 @@ if ($sessionmode === 'subscription') {
         }
 
         $checkoutservice->save_payment_status($sessionid);
-        $stripehelper->deliver_course($component, $paymentarea, $itemid, $USER->id);
+        $stripehelper->deliver_course($component, $paymentarea, $itemid, (int)$USER->id);
 
         // Find redirection.
         $url = helper::get_success_url($component, $paymentarea, $itemid);
