@@ -359,13 +359,13 @@ class subscription_service {
     /**
      * Get data table data for a specific subscription.
      *
-     * @param \stdClass $moodlesub Moodle subscription record
+     * @param subscription $moodlesub Moodle subscription record
      * @return array Table data
      * @throws ApiErrorException
      * @throws \coding_exception
      * @throws \moodle_exception
      */
-    public function get_subscription_table_data(\stdClass $moodlesub): ?array {
+    public function get_subscription_table_data(subscription $moodlesub): ?array {
         $product = $this->stripe->products->retrieve($moodlesub->productid);
         $price = $this->stripe->prices->retrieve($moodlesub->priceid);
         try {
