@@ -190,6 +190,7 @@ class checkout_service {
                 'address' => 'auto',
             ],
             'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
+            'expand' => ['customer', 'line_items'],
         ]);
 
         $this->save_checkout_session($session);

@@ -269,6 +269,7 @@ class subscription_service {
                 'address' => 'auto',
             ],
             'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
+            'expand' => ['customer', 'line_items'],
         ]);
 
 
