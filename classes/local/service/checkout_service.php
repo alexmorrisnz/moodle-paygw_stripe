@@ -192,6 +192,8 @@ class checkout_service {
             'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
         ]);
 
+        $this->save_checkout_session($session);
+
         return $session->id;
     }
 
