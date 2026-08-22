@@ -67,4 +67,24 @@ trait mapping_helper {
     protected static function nullable_int_field(\stdClass $record, string $field): ?int {
         return property_exists($record, $field) ? self::to_nullable_int($record->{$field}) : null;
     }
+
+    /**
+     * Convert a value to a boolean.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    protected static function to_bool(mixed $value): bool {
+        return (bool)$value;
+    }
+
+    /**
+     * Convert a boolean value to an integer.
+     *
+     * @param bool $value
+     * @return int
+     */
+    protected static function from_bool(bool $value): int {
+        return (int)$value;
+    }
 }

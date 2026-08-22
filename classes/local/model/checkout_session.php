@@ -40,6 +40,7 @@ final class checkout_session implements mappable_model {
      * @param string|null $paymentstatus
      * @param string|null $status
      * @param string $productid
+     * @param bool $delivered
      */
     public function __construct(
         /** @var int|null */
@@ -60,6 +61,8 @@ final class checkout_session implements mappable_model {
         public readonly ?string $status,
         /** @var string */
         public readonly string $productid,
+        /** @var bool */
+        public readonly bool $delivered,
     ) {
     }
 
@@ -80,6 +83,7 @@ final class checkout_session implements mappable_model {
             paymentstatus: $this->paymentstatus,
             status: $status,
             productid: $this->productid,
+            delivered: $this->delivered,
         );
     }
 
@@ -100,6 +104,28 @@ final class checkout_session implements mappable_model {
             paymentstatus: $paymentstatus,
             status: $this->status,
             productid: $this->productid,
+            delivered: $this->delivered,
+        );
+    }
+
+    /**
+     * Create a new instance with a different delivery status.
+     *
+     * @param bool $delivered
+     * @return self
+     */
+    public function with_delivered(bool $delivered): self {
+        return new self(
+            id: $this->id,
+            userid: $this->userid,
+            checkoutsessionid: $this->checkoutsessionid,
+            paymentintent: $this->paymentintent,
+            customerid: $this->customerid,
+            amounttotal: $this->amounttotal,
+            paymentstatus: $this->paymentstatus,
+            status: $this->status,
+            productid: $this->productid,
+            delivered: $delivered,
         );
     }
 
@@ -120,6 +146,7 @@ final class checkout_session implements mappable_model {
             paymentstatus: self::nullable_string_field($record, 'paymentstatus'),
             status: self::nullable_string_field($record, 'status'),
             productid: (string)$record->productid,
+            delivered: self::to_bool($record->delivered),
         );
     }
 
@@ -139,6 +166,7 @@ final class checkout_session implements mappable_model {
         $record->paymentstatus = $this->paymentstatus;
         $record->status = $this->status;
         $record->productid = $this->productid;
+        $record->delivered = self::from_bool($this->delivered);
         return $record;
     }
 }

@@ -60,13 +60,14 @@ if ($sessionmode === 'subscription') {
     }
 } else if ($sessionmode === 'payment') {
     if ($checkoutservice->is_paid($sessionid)) {
-        if ($checkoutservice->is_checkout_session_saved($sessionid)) {
+        if ($checkoutservice->is_delivered($sessionid)) {
             // User is attempting to replay course delivery, redirect away.
             redirect(new moodle_url('/'), get_string('alreadydeliveredcourse', 'paygw_stripe'));
         }
 
         $checkoutservice->save_payment_status($sessionid);
         $stripehelper->deliver_course($component, $paymentarea, $itemid, (int)$USER->id);
+        $checkoutservice->mark_delivered($sessionid);
 
         // Find redirection.
         $url = helper::get_success_url($component, $paymentarea, $itemid);

@@ -261,7 +261,8 @@ class checkout_service {
             $session->amount_total,
             $session->payment_status,
             $session->status,
-            $session->line_items->first()->price->product
+            $session->line_items->first()->price->product,
+            false
         );
 
         $this->checkoutrepository->save($record);
@@ -279,6 +280,35 @@ class checkout_service {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Check if a checkout session has been marked as delivered.
+     *
+     * @param string $sessionid
+     * @return bool
+     * @throws \dml_exception
+     */
+    public function is_delivered(string $sessionid): bool {
+        $session = $this->checkoutrepository->find_by_sessionid($sessionid);
+        if ($session) {
+            return $session->delivered;
+        }
+        return false;
+    }
+
+    /**
+     * Mark a checkout session as delivered.
+     *
+     * @param string $sessionid
+     * @return void
+     */
+    public function mark_delivered(string $sessionid) {
+        $session = $this->checkoutrepository->find_by_sessionid($sessionid);
+        if ($session) {
+            $session = $session->with_delivered(true);
+            $this->checkoutrepository->save($session);
+        }
     }
 
     /**
