@@ -272,8 +272,6 @@ class subscription_service {
             'expand' => ['customer', 'line_items'],
         ]);
 
-        $this->save_subscription($session);
-
         return $session->id;
     }
 
