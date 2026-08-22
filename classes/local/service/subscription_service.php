@@ -382,7 +382,7 @@ class subscription_service {
                 );
 
             return [
-                $product->name,
+                s($product->name),
                 $this->get_localised_cost($price->unit_amount, $price->currency) . ' / ' .
                 get_string('customsubscriptioninterval:' . $price->recurring->interval, 'paygw_stripe'),
                 userdate($subscription->items->data[0]->current_period_end),
