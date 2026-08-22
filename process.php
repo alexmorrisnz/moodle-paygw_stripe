@@ -47,6 +47,19 @@ $sessionmode = $checkoutservice->get_sessionmode($sessionid);
 
 if ($sessionmode === 'subscription') {
     $subscriptionservice = $factory->subscription_service();
+
+    if (
+        !$subscriptionservice->is_session_bound_to_request(
+            $sessionid,
+            (int)$USER->id,
+            $component,
+            $paymentarea,
+            $itemid
+        )
+    ) {
+        redirect(new moodle_url('/'), get_string('invalidsessionbinding', 'paygw_stripe'));
+    }
+
     $subscriptionstatus = $subscriptionservice->get_subscription_status($sessionid);
     if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
         $checkoutservice->save_payment_status($sessionid);
@@ -59,6 +72,18 @@ if ($sessionmode === 'subscription') {
         redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));
     }
 } else if ($sessionmode === 'payment') {
+    if (
+        !$checkoutservice->is_session_bound_to_request(
+            $sessionid,
+            (int)$USER->id,
+            $component,
+            $paymentarea,
+            $itemid
+        )
+    ) {
+        redirect(new moodle_url('/'), get_string('invalidsessionbinding', 'paygw_stripe'));
+    }
+
     if ($checkoutservice->is_paid($sessionid)) {
         if ($checkoutservice->is_delivered($sessionid)) {
             // User is attempting to replay course delivery, redirect away.

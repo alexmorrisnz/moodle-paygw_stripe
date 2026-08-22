@@ -524,4 +524,52 @@ class subscription_service {
         ))->add(DateInterval::createFromDateString($config->customsubscriptionintervalcount .
             ' ' . $config->customsubscriptioninterval . 's'));
     }
+
+    /**
+     * Check if the given session is bound to the given request.
+     *
+     * @param string $sessionid
+     * @param int $userid
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @return bool
+     * @throws ApiErrorException
+     * @throws \dml_exception
+     */
+    public function is_session_bound_to_request(
+        string $sessionid,
+        int $userid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): bool {
+        $session = $this->stripe->checkout->sessions->retrieve($sessionid, [
+            'expand' => ['line_items', 'subscription'],
+        ]);
+
+        if ($session->mode !== 'subscription') {
+            return false;
+        }
+
+        // Prefer metadata user binding.
+        if ((int)($session->metadata->userid ?? 0) !== $userid) {
+            return false;
+        }
+
+        // Bind requested item to the paid product.
+        $productid = $session->line_items->first()->price->product ?? null;
+        if (!$productid) {
+            return false;
+        }
+
+        $product = $this->productrepository->find_by_productid($productid);
+        if (!$product) {
+            return false;
+        }
+
+        return $product->component === $component
+            && $product->paymentarea === $paymentarea
+            && $product->itemid === $itemid;
+    }
 }

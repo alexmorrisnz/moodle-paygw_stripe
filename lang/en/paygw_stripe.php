@@ -54,6 +54,7 @@ $string['forcedlocale'] = 'Force locale';
 $string['forcedlocale_desc'] = 'Force locale for checkout, invoices, any Stripe related pages. If empty we will attempt to use the users locale pulled from the Moodle language settings.';
 $string['gatewaydescription'] = 'Stripe is an authorised payment gateway provider for processing credit card transactions.';
 $string['gatewayname'] = 'Stripe';
+$string['invalidsessionbinding'] = 'This payment session does not match the requested item.';
 $string['invoicecreation'] = 'Automatic Invoices';
 $string['invoicecreation_desc'] = 'Generate post-purchase invoice for one-time payments';
 
