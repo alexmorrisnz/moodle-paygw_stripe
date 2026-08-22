@@ -271,5 +271,22 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081501, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2026081801) {
+        // Define field delivered to be added to paygw_stripe_checkout_sessions.
+        $table = new xmldb_table('paygw_stripe_checkout_sessions');
+        $field = new xmldb_field('delivered', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'productid');
+
+        // Conditionally launch add field delivered.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Backfill all existing rows as delivered.
+        $DB->set_field('paygw_stripe_checkout_sessions', 'delivered', 1);
+
+        // Stripe savepoint reached.
+        upgrade_plugin_savepoint(true, 2026081801, 'paygw', 'stripe');
+    }
+
     return true;
 }

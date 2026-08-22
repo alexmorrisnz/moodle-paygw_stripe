@@ -21,6 +21,7 @@ namespace paygw_stripe\local\service;
 use core_payment\local\entities\payable;
 use paygw_stripe\local\model\checkout_session;
 use paygw_stripe\local\repository\checkout_session_repository;
+use paygw_stripe\local\repository\product_repository;
 use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -41,6 +42,10 @@ class checkout_service {
      * @var checkout_session_repository
      */
     private checkout_session_repository $checkoutrepository;
+    /**
+     * @var product_repository
+     */
+    private product_repository $productrepository;
     /**
      * @var product_pricing_service The product pricing service.
      */
@@ -75,6 +80,7 @@ class checkout_service {
         $this->stripe = $stripe;
 
         $this->checkoutrepository = new checkout_session_repository();
+        $this->productrepository = new product_repository();
         $this->productpricingservice = new product_pricing_service($stripe);
         $this->customerservice = new customer_service($stripe);
         $this->localeservice = new locale_service();
@@ -190,7 +196,10 @@ class checkout_service {
                 'address' => 'auto',
             ],
             'expires_at' => time() + min($CFG->sessiontimeout, 24 * 60 * 60),
+            'expand' => ['customer', 'line_items'],
         ]);
+
+        $this->save_checkout_session($session);
 
         return $session->id;
     }
@@ -258,7 +267,8 @@ class checkout_service {
             $session->amount_total,
             $session->payment_status,
             $session->status,
-            $session->line_items->first()->price->product
+            $session->line_items->first()->price->product,
+            false
         );
 
         $this->checkoutrepository->save($record);
@@ -276,6 +286,35 @@ class checkout_service {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Check if a checkout session has been marked as delivered.
+     *
+     * @param string $sessionid
+     * @return bool
+     * @throws \dml_exception
+     */
+    public function is_delivered(string $sessionid): bool {
+        $session = $this->checkoutrepository->find_by_sessionid($sessionid);
+        if ($session) {
+            return $session->delivered;
+        }
+        return false;
+    }
+
+    /**
+     * Mark a checkout session as delivered.
+     *
+     * @param string $sessionid
+     * @return void
+     */
+    public function mark_delivered(string $sessionid) {
+        $session = $this->checkoutrepository->find_by_sessionid($sessionid);
+        if ($session) {
+            $session = $session->with_delivered(true);
+            $this->checkoutrepository->save($session);
+        }
     }
 
     /**
@@ -304,5 +343,38 @@ class checkout_service {
      */
     public function find_session(string $sessionid): ?checkout_session {
         return $this->checkoutrepository->find_by_sessionid($sessionid);
+    }
+
+    /**
+     * Is the checkout session bound to the request (component, paymentarea, itemid, userid) ?
+     *
+     * @param string $sessionid
+     * @param int $userid
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @return bool
+     * @throws \dml_exception
+     */
+    public function is_session_bound_to_request(
+        string $sessionid,
+        int $userid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): bool {
+        $session = $this->checkoutrepository->find_by_sessionid($sessionid);
+        if (!$session || $session->userid !== $userid) {
+            return false;
+        }
+
+        $product = $this->productrepository->find_by_productid($session->productid);
+        if (!$product) {
+            return false;
+        }
+
+        return $product->component === $component
+            && $product->paymentarea === $paymentarea
+            && $product->itemid === $itemid;
     }
 }

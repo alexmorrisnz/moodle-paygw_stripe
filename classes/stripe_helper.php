@@ -165,7 +165,7 @@ class stripe_helper {
                 }
 
                 // Webhook retry already processed this session.
-                if ($sessionrecord->paymentstatus === 'paid') {
+                if ($sessionrecord->delivered) {
                     return true;
                 }
 
@@ -178,6 +178,9 @@ class stripe_helper {
                     $metadata['itemid'],
                     $sessionrecord->userid
                 );
+                if ($session->mode != 'subscription') {
+                    $this->checkoutservice->mark_delivered($session->id);
+                }
 
                 // Notify user payment was successful.
                 $url = helper::get_success_url($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
