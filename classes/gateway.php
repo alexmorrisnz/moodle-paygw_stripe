@@ -18,6 +18,7 @@ namespace paygw_stripe;
 
 use core_payment\form\account_gateway;
 use Exception;
+use paygw_stripe\local\service\invoice_service;
 use paygw_stripe\local\service\stripe_service_factory;
 
 /**
@@ -147,9 +148,23 @@ class gateway extends \core_payment\gateway {
         $mform->addElement('select', 'type', get_string('paymenttype', 'paygw_stripe'), [
             'onetime' => get_string('paymenttype:onetime', 'paygw_stripe'),
             'subscription' => get_string('paymenttype:subscription', 'paygw_stripe'),
+            'invoice' => get_string('paymenttype:invoice', 'paygw_stripe'),
         ]);
         $mform->setType('type', PARAM_TEXT);
         $mform->setDefault('type', 'onetime');
+        $mform->addHelpButton('type', 'paymenttype', 'paygw_stripe');
+        $mform->hideIf('allowpromotioncodes', 'type', 'eq', 'invoice');
+        $mform->hideIf('collectbillingaddress', 'type', 'eq', 'invoice');
+        $mform->hideIf('paymentmethodconfiguration', 'type', 'eq', 'invoice');
+
+        $bankcountries = [];
+        foreach (invoice_service::EU_BANK_TRANSFER_COUNTRIES as $country) {
+            $bankcountries[$country] = get_string($country, 'countries');
+        }
+        $mform->addElement('select', 'invoicebankcountry', get_string('invoicebankcountry', 'paygw_stripe'), $bankcountries);
+        $mform->setDefault('invoicebankcountry', invoice_service::DEFAULT_BANK_TRANSFER_COUNTRY);
+        $mform->addHelpButton('invoicebankcountry', 'invoicebankcountry', 'paygw_stripe');
+        $mform->hideIf('invoicebankcountry', 'type', 'neq', 'invoice');
 
         $mform->addElement(
             'advcheckbox',
@@ -194,6 +209,8 @@ class gateway extends \core_payment\gateway {
 
         $mform->hideIf('customsubscriptioninterval', 'subscriptioninterval', 'neq', 'custom');
         $mform->hideIf('customsubscriptionintervalcount', 'subscriptioninterval', 'neq', 'custom');
+        $mform->hideIf('customsubscriptioninterval', 'type', 'neq', 'subscription');
+        $mform->hideIf('customsubscriptionintervalcount', 'type', 'neq', 'subscription');
 
         $mform->addElement(
             'advcheckbox',
@@ -229,6 +246,17 @@ class gateway extends \core_payment\gateway {
         global $DB;
         if ($data->enabled && (empty($data->apikey) || empty($data->secretkey))) {
             $errors['enabled'] = get_string('gatewaycannotbeenabled', 'payment');
+        }
+
+        if (
+            ($data->type ?? '') === 'invoice' &&
+                !in_array(
+                    $data->invoicebankcountry ?? invoice_service::DEFAULT_BANK_TRANSFER_COUNTRY,
+                    invoice_service::EU_BANK_TRANSFER_COUNTRIES,
+                    true
+                )
+        ) {
+            $errors['invoicebankcountry'] = get_string('invalidinvoicebankcountry', 'paygw_stripe');
         }
 
         // Very hacky as this shouldn't live in a validation function, but due to Moodle limitations it's placed here.

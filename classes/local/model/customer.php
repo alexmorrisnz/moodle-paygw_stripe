@@ -34,6 +34,7 @@ final class customer implements mappable_model {
      * @param int|null $id
      * @param int $userid
      * @param string $customerid
+     * @param bool $billingmanaged Whether Stripe owns the billing identity.
      */
     public function __construct(
         /** @var int|null */
@@ -42,6 +43,8 @@ final class customer implements mappable_model {
         public readonly int $userid,
         /** @var string */
         public readonly string $customerid,
+        /** @var bool */
+        public readonly bool $billingmanaged = false,
     ) {
     }
 
@@ -56,6 +59,7 @@ final class customer implements mappable_model {
             id: self::nullable_int_field($record, 'id'),
             userid: (int)$record->userid,
             customerid: (string)$record->customerid,
+            billingmanaged: (bool)($record->billingmanaged ?? false),
         );
     }
 
@@ -69,6 +73,7 @@ final class customer implements mappable_model {
         $record->id = $this->id;
         $record->userid = $this->userid;
         $record->customerid = $this->customerid;
+        $record->billingmanaged = (int)$this->billingmanaged;
         return $record;
     }
 }

@@ -70,6 +70,32 @@ function paygw_stripe_update_webhooks(array $events) {
 }
 
 /**
+ * Add standalone invoice events without resetting existing webhook subscriptions.
+ * @return void
+ */
+function paygw_stripe_ensure_invoice_webhooks(): void {
+    global $DB;
+    foreach ($DB->get_records('payment_gateways', ['gateway' => 'stripe']) as $record) {
+        try {
+            $account = new account($record->accountid);
+            $gateway = $account->get_gateways(false)['stripe'] ?? null;
+            if (!$gateway) {
+                continue;
+            }
+            $config = $gateway->get_configuration();
+            if (empty($config['apikey']) || empty($config['secretkey'])) {
+                continue;
+            }
+            $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
+            $factory->webhook_service()->ensure_invoice_events((int)$record->accountid);
+        } catch (Exception $ignored) {
+            // Allow offline upgrades; start_payment repeats this check before using invoices.
+            continue;
+        }
+    }
+}
+
+/**
  * Delete webhooks, they will be recreated when used later.
  *
  * @return void
