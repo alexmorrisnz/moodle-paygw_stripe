@@ -41,6 +41,31 @@ if ($jsonpayload == null) {
     http_response_code(400);
     exit();
 }
+// Standalone invoices resolve their account and purchase from the local record.
+// Do not route subscription/Checkout invoices using their metadata.
+if (in_array($jsonpayload['type'] ?? '', ['invoice.paid', 'invoice.voided'], true)) {
+    if (empty($_SERVER['HTTP_STRIPE_SIGNATURE'])) {
+        http_response_code(400);
+        exit();
+    }
+    try {
+        $handler = new \paygw_stripe\local\service\invoice_webhook_handler();
+        $handled = $handler->handle($payload, $_SERVER['HTTP_STRIPE_SIGNATURE']);
+        http_response_code($handled ? 200 : 202);
+    } catch (SignatureVerificationException $e) {
+        // Stripe broadcasts to all registered endpoints, each with its own secret.
+        http_response_code(202);
+    } catch (UnexpectedValueException $e) {
+        http_response_code(400);
+    } catch (\Throwable $e) {
+        // A retry is essential if payment storage or course delivery failed.
+        http_response_code(500);
+        debugging('paygw_stripe: invoice webhook failed (' . get_class($e) . '), event ' .
+            clean_param($jsonpayload['id'] ?? '', PARAM_ALPHANUMEXT), DEBUG_DEVELOPER);
+    }
+    exit();
+}
+
 if (!isset($jsonpayload['data']['object']['metadata'])) {
     http_response_code(202);
     exit();

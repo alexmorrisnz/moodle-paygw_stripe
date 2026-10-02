@@ -44,6 +44,19 @@ $surcharge = helper::get_gateway_surcharge('stripe');
 $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(), $surcharge);
 
 $factory = new stripe_service_factory($config->apikey, $config->secretkey);
+if (($config->type ?? '') === 'invoice') {
+    $url = $factory->invoice_service()->start_payment(
+        $config,
+        $payable,
+        $description,
+        $cost,
+        $component,
+        $paymentarea,
+        $itemid
+    );
+    redirect($url);
+}
+
 if (!isset($config->type) || $config->type == 'onetime') {
     $checkoutservice = $factory->checkout_service();
     $sessionid = $checkoutservice->generate_payment(

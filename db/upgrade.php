@@ -288,5 +288,95 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081801, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2026092400) {
+        $table = new xmldb_table('paygw_stripe_invoices');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('paymentaccountid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('customerid', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('component', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('paymentarea', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('itemid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('amount', XMLDB_TYPE_INTEGER, '20', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('currency', XMLDB_TYPE_CHAR, '3', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('description', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('automatictax', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('taxbehavior', XMLDB_TYPE_CHAR, '9', null, XMLDB_NOTNULL, null, 'inclusive');
+        $table->add_field('tokenhash', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timeexpires', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'billing');
+        $table->add_field('delivered', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('invoiceid', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('invoiceitemid', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('portalsessionid', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('priceid', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('amounttotal', XMLDB_TYPE_INTEGER, '20', null, null, null, null);
+        $table->add_field('paymentid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+        $table->add_field('timeconfirmed', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+        $table->add_key('paymentaccountid', XMLDB_KEY_FOREIGN, ['paymentaccountid'], 'payment_accounts', ['id']);
+        $table->add_index('invoiceid', XMLDB_INDEX_UNIQUE, ['invoiceid']);
+        $table->add_index('tokenhash', XMLDB_INDEX_UNIQUE, ['tokenhash']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        $table = new xmldb_table('paygw_stripe_customers');
+        $field = new xmldb_field('billingmanaged', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Merge into existing endpoints; preserve their versions, secrets and other events.
+        // Failed API calls are retried before starting an invoice purchase.
+        paygw_stripe_ensure_invoice_webhooks();
+        upgrade_plugin_savepoint(true, 2026092400, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026092500) {
+        $table = new xmldb_table('paygw_stripe_invoices');
+        // The model opts new purchases into email. Existing purchases must not be sent retroactively.
+        $fields = [
+            new xmldb_field('emailstatus', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'legacy', 'timeconfirmed'),
+            new xmldb_field('timeemailstarted', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'emailstatus'),
+            new xmldb_field('timeemailsent', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'timeemailstarted'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026092500, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026092501) {
+        $table = new xmldb_table('paygw_stripe_invoices');
+        // Preserve old request parameters for retries; only new purchases opt into bank transfers.
+        $field = new xmldb_field('banktransfercountry', XMLDB_TYPE_CHAR, '2', null, null, null, null, 'timeemailsent');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2026092501, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026092502) {
+        $table = new xmldb_table('paygw_stripe_invoices');
+        // Existing purchases must retain the exact parameters of uncertain creation requests.
+        $fields = [
+            new xmldb_field('paymentmethodstatus', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'legacy',
+                'banktransfercountry'),
+            new xmldb_field('paymentmethods', XMLDB_TYPE_TEXT, null, null, null, null, null, 'paymentmethodstatus'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026092502, 'paygw', 'stripe');
+    }
+
     return true;
 }
