@@ -48,7 +48,7 @@ function fresh(): invoice_service {
     $DB->install();
     $api = new fake_stripe();
     \Stripe\ApiRequestor::setHttpClient($api);
-    $client = new StripeClient(['api_key' => 'sk_test_fake', 'stripe_version' => '2026-07-29.dahlia']);
+    $client = new StripeClient(['api_key' => 'sk_test_fake', 'stripe_version' => \paygw_stripe\stripe_helper::$apiversion]);
     helper::$failure = '';
     return new invoice_service($client);
 }
@@ -100,7 +100,7 @@ test('Pending billing flow creates no invoice, uses restricted direct Portal and
         check($config['features'][$feature]['enabled'] === false);
     }
     foreach ($api->requests as $r) {
-        check($r['version'] === (str_contains($r['path'], 'billing_portal') ? '2026-08-26.dahlia' : '2026-07-29.dahlia'));
+        check($r['version'] === \paygw_stripe\stripe_helper::$apiversion);
     }
 });
 

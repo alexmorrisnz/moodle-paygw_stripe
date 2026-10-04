@@ -28,9 +28,6 @@ use Stripe\StripeClient;
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class customer_portal_service {
-    /** @var string API version introducing the customer_update direct flow. */
-    public const API_VERSION = '2026-08-26.dahlia';
-
     /** @var StripeClient Stripe API client. */
     private StripeClient $stripe;
 
@@ -54,7 +51,6 @@ class customer_portal_service {
         if (!$lock) {
             throw new \moodle_exception('invoicebusy', 'paygw_stripe');
         }
-        $options = ['stripe_version' => self::API_VERSION];
         $params = [
             'features' => [
                 'customer_update' => [
@@ -69,7 +65,7 @@ class customer_portal_service {
             'login_page' => ['enabled' => false],
         ];
         try {
-            $configs = $this->stripe->billingPortal->configurations->all(['limit' => 100], $options);
+            $configs = $this->stripe->billingPortal->configurations->all(['limit' => 100]);
             foreach ($configs->autoPagingIterator() as $config) {
                 if (
                     ($config->metadata->moodle_site ?? '') === $site &&
@@ -77,8 +73,7 @@ class customer_portal_service {
                 ) {
                     $this->stripe->billingPortal->configurations->update(
                         $config->id,
-                        $params + ['active' => true],
-                        $options
+                        $params + ['active' => true]
                     );
                     return $config->id;
                 }
@@ -86,7 +81,7 @@ class customer_portal_service {
             $config = $this->stripe->billingPortal->configurations->create($params + [
                 'name' => 'Moodle invoice billing details',
                 'metadata' => ['moodle_site' => $site, 'moodle_purpose' => 'invoice_billing_v1'],
-            ], $options);
+            ]);
             return $config->id;
         } finally {
             $lock->release();
@@ -115,6 +110,6 @@ class customer_portal_service {
                     'redirect' => ['return_url' => $successurl],
                 ],
             ],
-        ], ['stripe_version' => self::API_VERSION]);
+        ]);
     }
 }

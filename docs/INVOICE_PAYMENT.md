@@ -83,11 +83,13 @@ behält weitere Ereignisse, Signaturschlüssel und API-Versionen bei und legt di
 lokale Rechnungstabelle an. Falls Stripe beim Upgrade nicht erreichbar ist, wird
 die Ereigniskonfiguration vor dem nächsten Rechnungskauf erneut geprüft.
 
-Nur der neue Portal-Service verwendet explizit die Stripe-API-Version
+Ab Version 2026100400 verwenden alle Stripe-API-Aufrufe des Plugins
 `2026-08-26.dahlia`, in der `flow_data.type=customer_update` verfügbar wurde.
-Checkout, Abonnements, Invoice-Aufrufe und bestehende Webhooks verwenden weiterhin
-die im Ausgangsprojekt gesetzte Version `2026-07-29.dahlia`. Das mitgelieferte
-Stripe-PHP-SDK verarbeitet die neuen Portal-Parameter ohne globale Umstellung.
+Neue Webhook-Endpunkte werden mit dieser Version angelegt. Bereits bestehende
+Endpunkte behalten ihre eigene festgelegte Event-Version und ihren Signaturschlüssel;
+ihre Ereignisse werden weiterhin anhand der gespeicherten Zuordnung geprüft.
+Das mitgelieferte Stripe-PHP-SDK verarbeitet die neuen Portal-Parameter mit
+dieser expliziten API-Version.
 
 ## Ablauf
 
