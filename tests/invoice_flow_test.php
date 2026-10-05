@@ -52,10 +52,6 @@ final class invoice_flow_test extends advanced_testcase {
         global $DB;
         parent::setUp();
         $this->resetAfterTest();
-        if ($this->name() === 'test_invoice_delivery_failure_rolls_back_payment_and_retries') {
-            // Moodle's test transaction otherwise encloses the service's delegated transaction.
-            $this->preventResetByRollback();
-        }
         $property = new \ReflectionProperty(ApiRequestor::class, '_httpClient');
         $property->setAccessible(true);
         $this->originalhttpclient = $property->getValue();
@@ -292,6 +288,8 @@ final class invoice_flow_test extends advanced_testcase {
 
     public function test_invoice_delivery_failure_rolls_back_payment_and_retries(): void {
         global $DB;
+        // Moodle's test transaction otherwise encloses the service's delegated transaction.
+        $this->preventResetByRollback();
         [$id, $token] = $this->start();
         $invoiceid = $this->complete($id, $token);
         $this->http->paid($invoiceid);
