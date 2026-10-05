@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 declare(strict_types=1);
 
@@ -106,8 +106,10 @@ final class invoice_upgrade_test extends advanced_testcase {
 
         $table = new \xmldb_table('paygw_stripe_invoices');
         $manager = $DB->get_manager();
-        foreach (['emailstatus', 'timeemailstarted', 'timeemailsent', 'banktransfercountry',
-            'paymentmethodstatus', 'paymentmethods'] as $field) {
+        foreach (
+            ['emailstatus', 'timeemailstarted', 'timeemailsent', 'banktransfercountry',
+            'paymentmethodstatus', 'paymentmethods'] as $field
+        ) {
             $this->assertTrue($manager->field_exists($table, new \xmldb_field($field)));
         }
 
@@ -146,8 +148,10 @@ final class invoice_upgrade_test extends advanced_testcase {
             'api_key' => 'sk_test_fake',
             'stripe_version' => stripe_helper::$apiversion,
         ]));
-        $this->assertSame('https://invoice.stripe.com/' . $invoiceid,
-            $service->complete_billing($id, $userid, $token));
+        $this->assertSame(
+            'https://invoice.stripe.com/' . $invoiceid,
+            $service->complete_billing($id, $userid, $token)
+        );
         $this->assertSame([], $this->http->sent);
         $this->assertSame('legacy', (new invoice_repository())->find_by_id($id)->emailstatus);
         $this->assertSame('legacy', (new invoice_repository())->find_by_id($id)->paymentmethodstatus);

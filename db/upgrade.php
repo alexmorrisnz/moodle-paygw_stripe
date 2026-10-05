@@ -366,8 +366,16 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         $table = new xmldb_table('paygw_stripe_invoices');
         // Existing purchases must retain the exact parameters of uncertain creation requests.
         $fields = [
-            new xmldb_field('paymentmethodstatus', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'legacy',
-                'banktransfercountry'),
+            new xmldb_field(
+                'paymentmethodstatus',
+                XMLDB_TYPE_CHAR,
+                '20',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                'legacy',
+                'banktransfercountry'
+            ),
             new xmldb_field('paymentmethods', XMLDB_TYPE_TEXT, null, null, null, null, null, 'paymentmethodstatus'),
         ];
         foreach ($fields as $field) {

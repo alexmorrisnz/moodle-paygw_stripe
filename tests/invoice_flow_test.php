@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 declare(strict_types=1);
 
@@ -72,9 +72,12 @@ final class invoice_flow_test extends advanced_testcase {
         $account = $this->getDataGenerator()->get_plugin_generator('core_payment')
             ->create_payment_account(['gateways' => 'stripe']);
         $this->accountid = (int)$account->get('id');
-        $DB->set_field('payment_gateways', 'config',
+        $DB->set_field(
+            'payment_gateways',
+            'config',
             json_encode(['apikey' => 'pk_test_fake', 'secretkey' => 'sk_test_fake']),
-            ['accountid' => $this->accountid, 'gateway' => 'stripe']);
+            ['accountid' => $this->accountid, 'gateway' => 'stripe']
+        );
         $course = $this->getDataGenerator()->create_course();
         $this->instanceid = (int)enrol_get_plugin('fee')->add_instance($course, [
             'courseid' => $course->id,
@@ -95,8 +98,15 @@ final class invoice_flow_test extends advanced_testcase {
         if ($country !== null) {
             $config->invoicebankcountry = $country;
         }
-        $url = $this->service->start_payment($config, new payable(49.95, $currency, $this->accountid),
-            'Course fee', 49.95, 'enrol_fee', 'fee', $this->instanceid);
+        $url = $this->service->start_payment(
+            $config,
+            new payable(49.95, $currency, $this->accountid),
+            'Course fee',
+            49.95,
+            'enrol_fee',
+            'fee',
+            $this->instanceid
+        );
         $this->assertStringStartsWith('https://billing.stripe.com/', $url);
         $session = end($this->http->sessions);
         parse_str(parse_url($session['flow_data']['after_completion']['redirect']['return_url'], PHP_URL_QUERY), $query);
@@ -138,30 +148,44 @@ final class invoice_flow_test extends advanced_testcase {
         $session = end($this->http->sessions);
         $this->assertStringNotContainsString($token, $session['return_url']);
         $this->assertSame('customer_update', $session['flow_data']['type']);
-        $this->assertSame(['name', 'address', 'email', 'tax_id'],
-            end($this->http->configs)['features']['customer_update']['allowed_updates']);
+        $this->assertSame(
+            ['name', 'address', 'email', 'tax_id'],
+            end($this->http->configs)['features']['customer_update']['allowed_updates']
+        );
         $this->assertSame(0, $DB->count_records('payments'));
         $this->assertCount(0, $this->http->invoices);
         $this->assertSame(hash('sha256', $token), $this->repository->find_by_id($id)->tokenhash);
 
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($id, $this->userid + 1, $token));
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($id, $this->userid, str_repeat('a', 64)));
-        $this->assert_error('invoicebillingincomplete',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid + 1, $token)
+        );
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid, str_repeat('a', 64))
+        );
+        $this->assert_error(
+            'invoicebillingincomplete',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         [$other, $othertoken] = $this->start();
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($other, $this->userid, $token));
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($other, $this->userid, $token)
+        );
         $record = $this->repository->find_by_id($other);
         $record->timeexpires = time() - 1;
         $this->repository->save($record);
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($other, $this->userid, $othertoken));
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($other, $this->userid, $othertoken)
+        );
         $this->assertSame('expired', $this->repository->find_by_id($other)->status);
         $this->service->cancel_billing($id, $this->userid);
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->assertSame('cancelled', $this->repository->find_by_id($id)->status);
         $this->assertCount(0, $this->http->invoices);
     }
@@ -185,8 +209,10 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertSame([['invoiceid' => $invoiceid, 'email' => 'billing@example.test',
             'key' => 'moodle-invoice-' . $record->tokenhash . '-send']], $this->http->sent);
         $this->assertSame(0, $DB->count_records('payments'));
-        $this->assertSame('https://invoice.stripe.com/' . $invoiceid,
-            $this->service->complete_billing($id, $this->userid, $token));
+        $this->assertSame(
+            'https://invoice.stripe.com/' . $invoiceid,
+            $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->assertCount(1, $this->http->invoices);
         $this->assertCount(1, $this->http->items);
         $this->assertCount(1, $this->http->sent);
@@ -241,8 +267,11 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertTrue($handler->handle($payload, $signature));
         $this->assertSame(1, $DB->count_records('payments'));
         $this->assertSame(1, $DB->count_records('user_enrolments', ['userid' => $this->userid]));
-        $this->assertSame(49.95, (float)$DB->get_field('payments', 'amount',
-            ['id' => $this->repository->find_by_id($id)->paymentid]));
+        $this->assertSame(49.95, (float)$DB->get_field(
+            'payments',
+            'amount',
+            ['id' => $this->repository->find_by_id($id)->paymentid]
+        ));
         $this->assertTrue($this->repository->find_by_id($id)->delivered);
         $this->assertTrue($this->service->process_event($this->event($invoiceid, 'invoice.voided')));
         $this->assertTrue($this->repository->find_by_id($id)->delivered);
@@ -255,8 +284,10 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertTrue($this->service->process_event($this->event($voidid)));
         $this->assertSame('void', $this->repository->find_by_id($other)->status);
         $this->assertSame(1, $DB->count_records('payments'));
-        $this->assert_error('invalidinvoicecontinuation',
-            fn() => $this->service->complete_billing($other, $this->userid, $othertoken));
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($other, $this->userid, $othertoken)
+        );
     }
 
     public function test_invoice_delivery_failure_rolls_back_payment_and_retries(): void {
@@ -286,10 +317,11 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertSame('FR', $this->repository->find_by_id($id)->banktransfercountry);
         $settings = $this->http->invoices[$invoiceid]['payment_settings'];
         $this->assertSame(['paypal', 'klarna', 'customer_balance'], $settings['payment_method_types']);
-        $this->assertSame('FR', $settings['payment_method_options']['customer_balance']
-            ['bank_transfer']['eu_bank_transfer']['country']);
-        $creates = array_values(array_filter($this->http->requests,
-            static fn($request) => $request['path'] === '/v1/invoices' && $request['method'] === 'post'));
+        $this->assertSame('FR', $settings['payment_method_options']['customer_balance']['bank_transfer']['eu_bank_transfer']['country']);
+        $creates = array_values(array_filter(
+            $this->http->requests,
+            static fn($request) => $request['path'] === '/v1/invoices' && $request['method'] === 'post'
+        ));
         $this->assertArrayNotHasKey('payment_settings', $creates[0]['params']);
         $before = count($this->http->requests);
         $this->service->complete_billing($id, $this->userid, $token);
@@ -306,28 +338,36 @@ final class invoice_flow_test extends advanced_testcase {
         [$id, $token] = $this->start();
         $this->billing_details($id);
         $this->http->lose = '/v1/invoices/in_1/send';
-        $this->assert_error('invoiceemailfailed',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invoiceemailfailed',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->assertSame('sending', $this->repository->find_by_id($id)->emailstatus);
         $this->assertCount(1, $this->http->sent);
         $this->complete($id, $token);
         $this->assertCount(1, $this->http->sent);
         $this->assertSame('sent', $this->repository->find_by_id($id)->emailstatus);
-        $sends = array_values(array_filter($this->http->requests,
-            static fn($request) => $request['path'] === '/v1/invoices/in_1/send'));
+        $sends = array_values(array_filter(
+            $this->http->requests,
+            static fn($request) => $request['path'] === '/v1/invoices/in_1/send'
+        ));
         $this->assertSame($sends[0]['key'], $sends[1]['key']);
 
         [$other, $othertoken] = $this->start();
         $this->billing_details($other);
         $this->http->lose = '/v1/invoices/in_2/send';
-        $this->assert_error('invoiceemailfailed',
-            fn() => $this->service->complete_billing($other, $this->userid, $othertoken));
+        $this->assert_error(
+            'invoiceemailfailed',
+            fn() => $this->service->complete_billing($other, $this->userid, $othertoken)
+        );
         $record = $this->repository->find_by_id($other);
         $record->timeemailstarted = time() - DAYSECS;
         $this->repository->save($record);
         $this->http->keys = [];
-        $this->assert_error('invoiceemailrecoveryrequired',
-            fn() => $this->service->complete_billing($other, $this->userid, $othertoken));
+        $this->assert_error(
+            'invoiceemailrecoveryrequired',
+            fn() => $this->service->complete_billing($other, $this->userid, $othertoken)
+        );
         $this->assertCount(2, $this->http->sent);
     }
 
@@ -345,8 +385,10 @@ final class invoice_flow_test extends advanced_testcase {
         $record->timeconfirmed = time() - DAYSECS;
         $this->repository->save($record);
         $this->http->keys = [];
-        $this->assert_error('invoicerecoveryrequired',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invoicerecoveryrequired',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->assertCount(1, $this->http->invoices);
         $this->assertCount(0, $this->http->items);
     }
@@ -355,20 +397,26 @@ final class invoice_flow_test extends advanced_testcase {
         [$id, $token] = $this->start();
         $this->billing_details($id);
         $this->http->failbefore = '/v1/invoice_payments';
-        $this->assert_error('invoicepaymentmethodsfailed',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invoicepaymentmethodsfailed',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->assertSame('pending', $this->repository->find_by_id($id)->paymentmethodstatus);
         $this->assertCount(0, $this->http->sent);
         $payment = $this->http->invoicepayments['in_1'];
         $this->http->invoicepayments = [];
-        $this->assert_error('invoicepaymentmethodsfailed',
-            fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assert_error(
+            'invoicepaymentmethodsfailed',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
         $this->http->invoicepayments['in_1'] = $payment;
         $this->http->expandintents = false;
         $this->complete($id, $token);
         $this->assertCount(1, $this->http->sent);
-        $this->assertNotEmpty(array_filter($this->http->requests,
-            static fn($request) => $request['path'] === '/v1/payment_intents/pi_in_1'));
+        $this->assertNotEmpty(array_filter(
+            $this->http->requests,
+            static fn($request) => $request['path'] === '/v1/payment_intents/pi_in_1'
+        ));
     }
 
     public function test_invoice_binding_rejects_altered_stripe_invoice(): void {
@@ -379,13 +427,17 @@ final class invoice_flow_test extends advanced_testcase {
         foreach (['customer' => 'cus_foreign', 'currency' => 'usd', 'total' => 1] as $field => $value) {
             $original = $this->http->invoices[$invoiceid][$field];
             $this->http->invoices[$invoiceid][$field] = $value;
-            $this->assert_error('invalidinvoicebinding',
-                fn() => $this->service->process_event($this->event($invoiceid)));
+            $this->assert_error(
+                'invalidinvoicebinding',
+                fn() => $this->service->process_event($this->event($invoiceid))
+            );
             $this->http->invoices[$invoiceid][$field] = $original;
         }
         $this->http->invoices[$invoiceid]['metadata']['userid'] = '999';
-        $this->assert_error('invalidinvoicebinding',
-            fn() => $this->service->process_event($this->event($invoiceid)));
+        $this->assert_error(
+            'invalidinvoicebinding',
+            fn() => $this->service->process_event($this->event($invoiceid))
+        );
         $this->assertSame(0, $DB->count_records('payments'));
     }
 
@@ -448,5 +500,4 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertSame(50.0, (float)$payment->amount);
         $this->assertSame('JPY', $payment->currency);
     }
-
 }

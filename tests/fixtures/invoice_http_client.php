@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 declare(strict_types=1);
 
@@ -131,8 +131,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 $params['unit_amount'] = (int)$params['unit_amount'];
             }
             if ($method === 'get') {
-                $response = $this->collection(array_values(array_filter($this->prices,
-                    static fn($price) => $price['product'] === $params['product'])));
+                $response = $this->collection(array_values(array_filter(
+                    $this->prices,
+                    static fn($price) => $price['product'] === $params['product']
+                )));
             } else {
                 $id ??= 'price_' . (count($this->prices) + 1);
                 $response = $this->prices[$id] = array_replace($this->prices[$id] ??
@@ -145,8 +147,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                     'total' => 0, 'amount_remaining' => 0, 'hosted_invoice_url' => null] + $params;
             } else if ($action === 'finalize') {
                 $invoice = $this->invoices[$id];
-                $total = array_sum(array_column(array_filter($this->items,
-                    static fn($item) => $item['invoice'] === $id), 'amount')) + $this->tax;
+                $total = array_sum(array_column(array_filter(
+                    $this->items,
+                    static fn($item) => $item['invoice'] === $id
+                ), 'amount')) + $this->tax;
                 $response = $this->invoices[$id] = array_replace($invoice, [
                     'status' => $this->autopaid ? 'paid' : 'open', 'total' => $total,
                     'amount_remaining' => $this->autopaid ? 0 : $total,
@@ -179,8 +183,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 $response = $this->invoices[$id];
             }
         } else if ($resource === 'invoice_payments' && $method === 'get') {
-            $payments = array_values(array_filter($this->invoicepayments,
-                static fn($payment) => $payment['invoice'] === $params['invoice']));
+            $payments = array_values(array_filter(
+                $this->invoicepayments,
+                static fn($payment) => $payment['invoice'] === $params['invoice']
+            ));
             foreach ($payments as &$payment) {
                 if ($this->expandintents && in_array('data.payment.payment_intent', $params['expand'] ?? [], true)) {
                     $intentid = $payment['payment']['payment_intent'];
