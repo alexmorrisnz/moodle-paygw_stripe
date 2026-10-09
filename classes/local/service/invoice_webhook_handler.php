@@ -25,6 +25,7 @@ use Stripe\Webhook;
 
 /**
  * Resolve invoice webhooks through stored purchases before verifying signatures.
+ *
  * @package paygw_stripe
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,6 +34,7 @@ class invoice_webhook_handler {
     /**
      * Untrusted input is used only to select the stored record and signing secret.
      * No payment/enrolment writes occur until signature verification succeeds.
+     *
      * @param string $payload
      * @param string $signature
      * @return bool False for subscription, Checkout or other unmanaged invoices.
@@ -43,16 +45,19 @@ class invoice_webhook_handler {
         if (!is_string($id) || !($record = (new invoice_repository())->find_by_invoiceid($id))) {
             return false;
         }
+
         $webhook = (new webhook_repository())->find_by_paymentaccountid($record->paymentaccountid);
         if (!$webhook) {
             throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
         }
+
         $event = Webhook::constructEvent($payload, $signature, $webhook->secret);
         $account = new account($record->paymentaccountid);
         $gateway = $account->get_gateways(false)['stripe'] ?? null;
         if (!$gateway) {
             throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
         }
+
         $config = $gateway->get_configuration();
         $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
         return $factory->invoice_service()->process_event($event);

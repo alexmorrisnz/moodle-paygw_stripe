@@ -23,6 +23,7 @@ use Stripe\StripeClient;
 
 /**
  * Billing identity collection, isolated from Checkout and subscription portals.
+ *
  * @package paygw_stripe
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,6 +34,7 @@ class customer_portal_service {
 
     /**
      * Initialise the restricted Portal service.
+     *
      * @param StripeClient $stripe
      */
     public function __construct(StripeClient $stripe) {
@@ -41,6 +43,7 @@ class customer_portal_service {
 
     /**
      * Get or create a dedicated configuration, never modify the default portal.
+     *
      * @return string
      */
     private function configuration(): string {
@@ -51,6 +54,7 @@ class customer_portal_service {
         if (!$lock) {
             throw new \moodle_exception('invoicebusy', 'paygw_stripe');
         }
+
         $params = [
             'features' => [
                 'customer_update' => [
@@ -64,12 +68,13 @@ class customer_portal_service {
             ],
             'login_page' => ['enabled' => false],
         ];
+
         try {
             $configs = $this->stripe->billingPortal->configurations->all(['limit' => 100]);
             foreach ($configs->autoPagingIterator() as $config) {
                 if (
                     ($config->metadata->moodle_site ?? '') === $site &&
-                        ($config->metadata->moodle_purpose ?? '') === 'invoice_billing_v1' && !$config->is_default
+                    ($config->metadata->moodle_purpose ?? '') === 'invoice_billing_v1' && !$config->is_default
                 ) {
                     $this->stripe->billingPortal->configurations->update(
                         $config->id,
@@ -79,9 +84,10 @@ class customer_portal_service {
                 }
             }
             $config = $this->stripe->billingPortal->configurations->create($params + [
-                'name' => 'Moodle invoice billing details',
-                'metadata' => ['moodle_site' => $site, 'moodle_purpose' => 'invoice_billing_v1'],
-            ]);
+                    'name' => 'Moodle invoice billing details',
+                    'metadata' => ['moodle_site' => $site, 'moodle_purpose' => 'invoice_billing_v1'],
+                ]);
+
             return $config->id;
         } finally {
             $lock->release();
@@ -91,6 +97,7 @@ class customer_portal_service {
     /**
      * Only Stripe's successful Save redirect receives the secret continuation.
      * The ordinary Return URL carries no continuation token.
+     *
      * @param string $customerid
      * @param string $successurl
      * @param string $returnurl

@@ -29,6 +29,7 @@ use Stripe\StripeClient;
 
 /**
  * Standalone invoices. Portal completion creates invoices; only webhooks deliver.
+ *
  * @package paygw_stripe
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -48,6 +49,7 @@ class invoice_service {
 
     /**
      * Initialise the independent invoice services and repository.
+     *
      * @param StripeClient $stripe
      */
     public function __construct(StripeClient $stripe) {
@@ -58,6 +60,7 @@ class invoice_service {
 
     /**
      * Save a pending purchase and redirect to billing collection. No invoice exists yet.
+     *
      * @param object $config
      * @param payable $payable
      * @param string $description
@@ -79,36 +82,40 @@ class invoice_service {
         global $USER, $CFG;
         $bankcountry = null;
         if (strtolower($payable->get_currency()) === 'eur') {
-            $bankcountry = strtoupper(trim((string)($config->invoicebankcountry ?? self::DEFAULT_BANK_TRANSFER_COUNTRY)));
+            $bankcountry = strtoupper(trim((string) ($config->invoicebankcountry ?? self::DEFAULT_BANK_TRANSFER_COUNTRY)));
             if (!in_array($bankcountry, self::EU_BANK_TRANSFER_COUNTRIES, true)) {
                 throw new \moodle_exception('invalidinvoicebankcountry', 'paygw_stripe');
             }
         }
+
         (new webhook_service($this->stripe))->ensure_invoice_events($payable->get_account_id());
+
         $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
         $token = bin2hex(random_bytes(32));
         $now = time();
+
         $record = new invoice(
             id: null,
-            userid: (int)$USER->id,
+            userid: (int) $USER->id,
             paymentaccountid: $payable->get_account_id(),
             customerid: $customer->id,
             component: $component,
             paymentarea: $paymentarea,
             itemid: $itemid,
-            amount: (int)round($this->pricing->get_unit_amount($cost, $payable->get_currency())),
+            amount: (int) round($this->pricing->get_unit_amount($cost, $payable->get_currency())),
             currency: strtolower($payable->get_currency()),
             description: $description,
             automatictax: !empty($config->enableautomatictax),
             taxbehavior: $config->defaulttaxbehavior ?? 'inclusive',
             tokenhash: hash('sha256', $token),
             timecreated: $now,
-            timeexpires: $now + min((int)$CFG->sessiontimeout, HOURSECS),
+            timeexpires: $now + min((int) $CFG->sessiontimeout, HOURSECS),
             timemodified: $now,
             banktransfercountry: $bankcountry,
             paymentmethodstatus: $bankcountry === null ? 'legacy' : 'pending',
         );
         $record = $this->repository->save($record);
+
         $success = new \moodle_url('/payment/gateway/stripe/invoice.php', ['request' => $record->id, 'token' => $token]);
         $return = new \moodle_url('/payment/gateway/stripe/invoice_return.php', [
             'request' => $record->id, 'sesskey' => sesskey(),
@@ -119,6 +126,7 @@ class invoice_service {
             $return->out(false),
             (new locale_service())->get_stripe_locale_for_user($USER)
         );
+
         $record->portalsessionid = $portal->id;
         $this->repository->save($record);
         return $portal->url;
@@ -126,6 +134,7 @@ class invoice_service {
 
     /**
      * Serialise callback retries and webhook deliveries for the same purchase.
+     *
      * @param int $id
      * @return \core\lock\lock
      */
@@ -140,6 +149,7 @@ class invoice_service {
 
     /**
      * Cancel an ordinary Portal return; it can never create an invoice.
+     *
      * @param int $id
      * @param int $userid
      */
@@ -150,6 +160,7 @@ class invoice_service {
             if (!$record || $record->userid !== $userid) {
                 throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
             }
+
             if ($record->status === 'billing') {
                 $record->status = 'cancelled';
                 $record->timemodified = time();
@@ -162,6 +173,7 @@ class invoice_service {
 
     /**
      * Continue only the matching user's saved billing flow; retries reuse its invoice.
+     *
      * @param int $id
      * @param int $userid
      * @param string $token
@@ -173,25 +185,28 @@ class invoice_service {
             $record = $this->repository->find_by_id($id);
             if (
                 !$record || $record->userid !== $userid || !$record->portalsessionid ||
-                    !hash_equals($record->tokenhash, hash('sha256', $token)) ||
-                    in_array($record->status, ['cancelled', 'void', 'expired'], true)
+                !hash_equals($record->tokenhash, hash('sha256', $token)) ||
+                in_array($record->status, ['cancelled', 'void', 'expired'], true)
             ) {
                 throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
             }
+
             if ($record->status === 'billing') {
                 if ($record->timeexpires < time()) {
                     $record->status = 'expired';
                     $this->repository->save($record);
                     throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
                 }
+
                 // No profile synchronisation: use the billing identity saved in Stripe.
                 $customer = $this->stripe->customers->retrieve($record->customerid, ['expand' => ['tax_ids']]);
                 if (
                     !empty($customer->deleted) || empty($customer->name) || empty($customer->email) ||
-                        empty($customer->address->line1) || empty($customer->address->country)
+                    empty($customer->address->line1) || empty($customer->address->country)
                 ) {
                     throw new \moodle_exception('invoicebillingincomplete', 'paygw_stripe');
                 }
+
                 $record->status = 'creating';
                 $record->timeconfirmed = time();
                 $record->timemodified = time();
@@ -202,12 +217,15 @@ class invoice_service {
             if ($record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time()) {
                 throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
             }
+
             $stripeinvoice = $this->create_invoice($record);
             if (in_array($stripeinvoice->status, ['void', 'uncollectible'], true) || !$stripeinvoice->hosted_invoice_url) {
                 throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
             }
+
             $stripeinvoice = $this->configure_invoice_payment_methods($record, $stripeinvoice);
             $this->send_invoice_email($record, $stripeinvoice);
+
             return $stripeinvoice->hosted_invoice_url;
         } finally {
             $lock->release();
@@ -216,6 +234,7 @@ class invoice_service {
 
     /**
      * Stable Stripe idempotency key per purchase and operation.
+     *
      * @param invoice $record
      * @param string $operation
      * @return array
@@ -226,6 +245,7 @@ class invoice_service {
 
     /**
      * Bind every external object to an immutable local purchase and this Moodle site.
+     *
      * @param invoice $record
      * @return array
      */
@@ -235,18 +255,19 @@ class invoice_service {
             'gateway' => 'paygw_stripe',
             'flow' => 'invoice',
             'moodle_site' => hash('sha256', $CFG->wwwroot),
-            'transactionid' => (string)$record->id,
-            'paymentaccountid' => (string)$record->paymentaccountid,
-            'userid' => (string)$record->userid,
+            'transactionid' => (string) $record->id,
+            'paymentaccountid' => (string) $record->paymentaccountid,
+            'userid' => (string) $record->userid,
             'component' => $record->component,
             'paymentarea' => $record->paymentarea,
-            'itemid' => (string)$record->itemid,
+            'itemid' => (string) $record->itemid,
         ];
     }
 
     /**
      * Create a draft first so its one item cannot leak into another pending invoice.
      * Checkpoints are persisted before finalization can emit invoice.paid.
+     *
      * @param invoice $record
      * @return stripe_invoice
      */
@@ -255,14 +276,15 @@ class invoice_service {
             $cost = $this->major_amount($record->amount, $record->currency);
             $payable = new payable($cost, strtoupper($record->currency), $record->paymentaccountid);
             [, $price] = $this->pricing->create_product_and_price(
-                (object)['enableautomatictax' => $record->automatictax, 'defaulttaxbehavior' => $record->taxbehavior],
+                (object) ['enableautomatictax' => $record->automatictax, 'defaulttaxbehavior' => $record->taxbehavior],
                 $payable,
                 $record->description,
                 $cost,
                 $record->component,
                 $record->paymentarea,
-                (string)$record->itemid
+                (string) $record->itemid
             );
+
             // Shared Checkout prices may have a different, immutable tax behaviour.
             if ($record->automatictax && $price->tax_behavior !== $record->taxbehavior) {
                 $price = $this->pricing->create_price(
@@ -276,6 +298,7 @@ class invoice_service {
             $record->priceid = $price->id;
             $this->repository->save($record);
         }
+
         if (!$record->invoiceid) {
             $params = [
                 'customer' => $record->customerid,
@@ -289,13 +312,15 @@ class invoice_service {
                 'discounts' => [],
                 'metadata' => $this->metadata($record),
             ];
+
             // A null snapshot preserves pre-upgrade requests, including uncertain Stripe writes.
             if (
                 $record->currency === 'eur' && $record->banktransfercountry !== null &&
-                    $record->paymentmethodstatus === 'legacy'
+                $record->paymentmethodstatus === 'legacy'
             ) {
                 $params['payment_settings'] = $this->bank_transfer_settings($record, ['customer_balance']);
             }
+
             // New purchases let Stripe resolve invoice defaults when finalizing.
             $stripeinvoice = $this->stripe->invoices->create($params, $this->options($record, 'create'));
             $record->invoiceid = $stripeinvoice->id;
@@ -303,9 +328,11 @@ class invoice_service {
         } else {
             $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
         }
+
         if (!$this->is_bound($record, $stripeinvoice)) {
             throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
         }
+
         if ($stripeinvoice->status === 'draft') {
             if (!$record->invoiceitemid) {
                 $item = $this->stripe->invoiceItems->create([
@@ -319,22 +346,26 @@ class invoice_service {
                 $record->invoiceitemid = $item->id;
                 $this->repository->save($record);
             }
+
             $stripeinvoice = $this->stripe->invoices->finalizeInvoice(
                 $record->invoiceid,
                 ['auto_advance' => false],
                 $this->options($record, 'finalize')
             );
         }
+
         // Never deliver here, even if a credit balance immediately paid the invoice.
         $record->amounttotal = $stripeinvoice->total;
         $record->status = $stripeinvoice->status;
         $record->timemodified = time();
         $this->repository->save($record);
+
         return $stripeinvoice;
     }
 
     /**
      * Add EUR transfer options without replacing any other payment-method options.
+     *
      * @param invoice $record
      * @param string[] $methods Complete payment-method list.
      * @return array
@@ -357,6 +388,7 @@ class invoice_service {
     /**
      * Keep the payment methods Stripe resolved for this invoice and append bank transfer.
      * Snapshot the complete list before updating; never repeat the update after success.
+     *
      * @param invoice $record
      * @param stripe_invoice $stripeinvoice
      * @return stripe_invoice
@@ -365,15 +397,18 @@ class invoice_service {
         if (in_array($record->paymentmethodstatus, ['legacy', 'ready'], true)) {
             return $stripeinvoice;
         }
+
         // Fully credited invoices need no payment choice and may have no PaymentIntent.
         if ($stripeinvoice->status === 'paid') {
             $record->paymentmethodstatus = 'ready';
             $this->repository->save($record);
             return $stripeinvoice;
         }
+
         if ($stripeinvoice->status !== 'open' || $record->currency !== 'eur' || !$record->banktransfercountry) {
             throw new \moodle_exception('invoicepaymentmethodsfailed', 'paygw_stripe');
         }
+
         try {
             if ($record->paymentmethodstatus === 'pending') {
                 $methods = $this->resolved_invoice_payment_methods($record);
@@ -382,6 +417,7 @@ class invoice_service {
                 $record->paymentmethodstatus = 'applying';
                 $this->repository->save($record);
             }
+
             $methods = json_decode($record->paymentmethods, true, 512, JSON_THROW_ON_ERROR);
             $updated = $this->stripe->invoices->update(
                 $record->invoiceid,
@@ -391,19 +427,22 @@ class invoice_service {
         } catch (\Stripe\Exception\ApiErrorException $e) {
             throw new \moodle_exception('invoicepaymentmethodsfailed', 'paygw_stripe');
         }
+
         if (!$this->is_bound($record, $updated)) {
             throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
         }
+
         $settings = $updated->payment_settings;
         $balance = $settings->payment_method_options->customer_balance ?? null;
         if (
             array_diff($methods, $settings->payment_method_types ?? []) ||
-                ($balance->funding_type ?? null) !== 'bank_transfer' ||
-                ($balance->bank_transfer->type ?? null) !== 'eu_bank_transfer' ||
-                ($balance->bank_transfer->eu_bank_transfer->country ?? null) !== $record->banktransfercountry
+            ($balance->funding_type ?? null) !== 'bank_transfer' ||
+            ($balance->bank_transfer->type ?? null) !== 'eu_bank_transfer' ||
+            ($balance->bank_transfer->eu_bank_transfer->country ?? null) !== $record->banktransfercountry
         ) {
             throw new \moodle_exception('invoicepaymentmethodsfailed', 'paygw_stripe');
         }
+
         $record->paymentmethodstatus = 'ready';
         $record->timemodified = time();
         $this->repository->save($record);
@@ -413,6 +452,7 @@ class invoice_service {
     /**
      * Read the default invoice PaymentIntent; attached third-party payments are not defaults.
      * The PaymentIntent itself is never edited.
+     *
      * @param invoice $record
      * @return string[]
      */
@@ -422,24 +462,28 @@ class invoice_service {
             'limit' => 100,
             'expand' => ['data.payment.payment_intent'],
         ]);
+
         foreach ($payments->autoPagingIterator() as $payment) {
             if (
                 !$payment->is_default || $payment->invoice !== $record->invoiceid ||
-                    $payment->status !== 'open' || $payment->payment->type !== 'payment_intent'
+                $payment->status !== 'open' || $payment->payment->type !== 'payment_intent'
             ) {
                 continue;
             }
+
             $intent = $payment->payment->payment_intent;
             if (is_string($intent)) {
                 $intent = $this->stripe->paymentIntents->retrieve($intent);
             }
+
             if (
                 $intent instanceof \Stripe\PaymentIntent && $intent->customer === $record->customerid &&
-                    $intent->currency === $record->currency && !empty($intent->payment_method_types)
+                $intent->currency === $record->currency && !empty($intent->payment_method_types)
             ) {
                 return $intent->payment_method_types;
             }
         }
+
         // Do not silently replace unavailable Stripe defaults with a hard-coded fallback.
         throw new \moodle_exception('invoicepaymentmethodsfailed', 'paygw_stripe');
     }
@@ -447,6 +491,7 @@ class invoice_service {
     /**
      * Ask Stripe to email the finalized invoice once, while holding the purchase lock.
      * A successful API response confirms submission, not delivery to the recipient's inbox.
+     *
      * @param invoice $record
      * @param stripe_invoice $stripeinvoice
      */
@@ -455,19 +500,23 @@ class invoice_service {
         if (in_array($record->emailstatus, ['sent', 'legacy'], true)) {
             return;
         }
+
         if (!in_array($stripeinvoice->status, ['open', 'paid'], true)) {
             throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
         }
+
         // A lost response must not cause a second email after Stripe expires the key.
         if ($record->timeemailstarted !== null && $record->timeemailstarted + 23 * HOURSECS < time()) {
             throw new \moodle_exception('invoiceemailrecoveryrequired', 'paygw_stripe');
         }
+
         if ($record->timeemailstarted === null) {
             $record->emailstatus = 'sending';
             $record->timeemailstarted = time();
             $record->timemodified = time();
             $this->repository->save($record);
         }
+
         try {
             // Keep auto_advance disabled; sending is explicit and uses Stripe's billing email.
             $sentinvoice = $this->stripe->invoices->sendInvoice(
@@ -478,9 +527,11 @@ class invoice_service {
         } catch (\Stripe\Exception\ApiErrorException $e) {
             throw new \moodle_exception('invoiceemailfailed', 'paygw_stripe');
         }
+
         if (!$this->is_bound($record, $sentinvoice)) {
             throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
         }
+
         $record->emailstatus = 'sent';
         $record->timeemailsent = time();
         $record->timemodified = time();
@@ -489,6 +540,7 @@ class invoice_service {
 
     /**
      * Verify ID, customer, currency, collection method and all purchase references.
+     *
      * @param invoice $record
      * @param stripe_invoice $stripeinvoice
      * @return bool
@@ -496,12 +548,13 @@ class invoice_service {
     private function is_bound(invoice $record, stripe_invoice $stripeinvoice): bool {
         if (
             $stripeinvoice->id !== $record->invoiceid || $stripeinvoice->customer !== $record->customerid ||
-                $stripeinvoice->currency !== $record->currency || $stripeinvoice->collection_method !== 'send_invoice'
+            $stripeinvoice->currency !== $record->currency || $stripeinvoice->collection_method !== 'send_invoice'
         ) {
             return false;
         }
+
         foreach ($this->metadata($record) as $key => $value) {
-            if ((string)($stripeinvoice->metadata[$key] ?? '') !== $value) {
+            if ((string) ($stripeinvoice->metadata[$key] ?? '') !== $value) {
                 return false;
             }
         }
@@ -510,6 +563,7 @@ class invoice_service {
 
     /**
      * Convert the stored Stripe amount for Moodle's payment API.
+     *
      * @param int $amount
      * @param string $currency
      * @return float
@@ -520,6 +574,7 @@ class invoice_service {
 
     /**
      * Handle an already signature-verified event. All delivery writes are atomic.
+     *
      * @param Event $event
      * @return bool Whether this event belongs to a stored Moodle invoice.
      */
@@ -528,20 +583,24 @@ class invoice_service {
         if (!in_array($event->type, ['invoice.paid', 'invoice.voided'], true)) {
             return false;
         }
+
         $record = $this->repository->find_by_invoiceid($event->data->object->id);
         if (!$record) {
             return false;
         }
+
         $lock = $this->lock($record->id);
         try {
             $record = $this->repository->find_by_id($record->id);
             if ($record->delivered) {
                 return true; // Accounting changes after delivery never revoke access.
             }
+
             $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
             if (!$this->is_bound($record, $stripeinvoice)) {
                 throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
             }
+
             if ($event->type === 'invoice.voided') {
                 if ($stripeinvoice->status === 'void') {
                     $record->status = 'void';
@@ -550,18 +609,22 @@ class invoice_service {
                 }
                 return true;
             }
+
             if ($stripeinvoice->status !== 'paid' || $stripeinvoice->amount_remaining != 0) {
                 return true; // A stale event cannot grant access to an unpaid/void invoice.
             }
+
             if (!$record->invoiceitemid || !$record->timeconfirmed) {
                 throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
             }
-            if ($record->amounttotal !== null && $record->amounttotal !== (int)$stripeinvoice->total) {
+
+            if ($record->amounttotal !== null && $record->amounttotal !== (int) $stripeinvoice->total) {
                 throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
             }
+
             $transaction = $DB->start_delegated_transaction();
             try {
-                $record->amounttotal = (int)$stripeinvoice->total;
+                $record->amounttotal = (int) $stripeinvoice->total;
                 $record->paymentid = helper::save_payment(
                     $record->paymentaccountid,
                     $record->component,
