@@ -19,7 +19,9 @@ declare(strict_types=1);
 namespace paygw_stripe\tests\fixtures;
 
 /**
- * In-memory Stripe HTTP endpoint. The real SDK serialises requests and constructs responses.
+ * Stateful invoice-flow HTTP fixture. The real SDK constructs requests and responses.
+ * Seed resource arrays with API response data and inspect requests to assert SDK payloads.
+ * Failure controls simulate API errors, outages, and response loss around remote writes.
  *
  * @package paygw_stripe
  * @category test
@@ -27,28 +29,60 @@ namespace paygw_stripe\tests\fixtures;
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
+    /** @var array Recorded HTTP requests and their parameters. */
     public array $requests = [];
+    /** @var array Customer resources indexed by ID. */
     public array $customers = [];
+    /** @var array Invoice resources indexed by ID. */
     public array $invoices = [];
+    /** @var array Invoice item resources indexed by ID. */
     public array $items = [];
+    /** @var array Product resources indexed by ID. */
     public array $products = [];
+    /** @var array Price resources indexed by ID. */
     public array $prices = [];
+    /** @var array Billing portal configurations indexed by ID. */
     public array $configs = [];
+    /** @var array Billing portal sessions indexed by ID. */
     public array $sessions = [];
+    /** @var array Webhook endpoints indexed by ID. */
     public array $webhooks = [];
+    /** @var array Cached request parameters and responses indexed by idempotency key. */
     public array $keys = [];
+    /** @var array Recorded invoice email deliveries. */
     public array $sent = [];
+    /** @var array Default invoice payment method types. */
     public array $invoicemethods = ['card', 'paypal', 'sepa_debit'];
+    /** @var array Payment intents indexed by ID. */
     public array $paymentintents = [];
+    /** @var array Invoice payments indexed by invoice ID. */
     public array $invoicepayments = [];
+    /** @var bool Whether to expand payment intents when requested. */
     public bool $expandintents = true;
+    /** @var string Path whose next response is lost after the remote write. */
     public string $lose = '';
+    /** @var string Path whose next request fails before the remote write. */
     public string $failbefore = '';
+    /** @var bool Whether customer requests simulate an outage. */
     public bool $customererror = false;
+    /** @var bool Whether invoices are automatically paid on finalization. */
     public bool $autopaid = false;
+    /** @var int Tax amount added to finalized invoices in minor currency units. */
     public int $tax = 0;
 
-    public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null) {
+    /**
+     * Handle an SDK request against the in-memory API.
+     *
+     * @param string $method HTTP method
+     * @param string $absurl Absolute request URL
+     * @param array $headers HTTP headers
+     * @param array $params Request parameters
+     * @param bool $hasfile Whether the request contains a file
+     * @param string $apimode Stripe API mode
+     * @param int|null $maxnetworkretries Maximum network retries
+     * @return array Response body, HTTP status and headers
+     */
+    public function request($method, $absurl, $headers, $params, $hasfile, $apimode = 'v1', $maxnetworkretries = null) {
         array_walk_recursive($params, static function (&$value): void {
             if ($value === 'true') {
                 $value = true;
@@ -56,7 +90,7 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 $value = false;
             }
         });
-        $path = parse_url($absUrl, PHP_URL_PATH);
+        $path = parse_url($absurl, PHP_URL_PATH);
         $key = '';
         $version = '';
         foreach ($headers as $header) {
@@ -78,6 +112,7 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
             }
             return [json_encode($this->keys[$key]['response']), 200, []];
         }
+        $requestparams = $params;
         $parts = explode('/', trim($path, '/'));
         $resource = $parts[1];
         $id = $parts[2] ?? null;
@@ -95,8 +130,7 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 $id = 'cus_' . (count($this->customers) + 1);
                 $response = $this->customers[$id] = ['id' => $id, 'object' => 'customer'] + $params;
             } else if (!isset($this->customers[$id])) {
-                return [json_encode(['error' => ['type' => 'invalid_request_error', 'code' => 'resource_missing',
-                    'message' => 'No such customer']]), 404, []];
+                return $this->missing_resource('customer');
             } else if ($method === 'post') {
                 $response = $this->customers[$id] = array_replace($this->customers[$id], $params);
             } else {
@@ -116,29 +150,50 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 'url' => 'https://billing.stripe.com/session/' . $id] + $params;
         } else if ($resource === 'webhook_endpoints') {
             $id ??= 'we_' . (count($this->webhooks) + 1);
-            if ($method === 'get') {
+            if ($method === 'get' || $method === 'delete') {
+                if (!isset($this->webhooks[$id])) {
+                    return $this->missing_resource('webhook endpoint');
+                }
                 $response = $this->webhooks[$id];
+                if ($method === 'delete') {
+                    unset($this->webhooks[$id]);
+                    $response = ['id' => $id, 'object' => 'webhook_endpoint', 'deleted' => true];
+                }
             } else {
                 $response = $this->webhooks[$id] = array_replace($this->webhooks[$id] ??
                     ['id' => $id, 'object' => 'webhook_endpoint', 'secret' => 'whsec_fake'], $params);
             }
         } else if ($resource === 'products') {
-            $id ??= 'prod_' . (count($this->products) + 1);
-            $response = $this->products[$id] = array_replace($this->products[$id] ??
-                ['id' => $id, 'object' => 'product'], $params);
+            if ($method === 'get') {
+                if (!isset($this->products[$id])) {
+                    return $this->missing_resource('product');
+                }
+                $response = $this->products[$id];
+            } else {
+                $id ??= 'prod_' . (count($this->products) + 1);
+                $response = $this->products[$id] = array_replace($this->products[$id] ??
+                    ['id' => $id, 'object' => 'product'], $params);
+            }
         } else if ($resource === 'prices') {
             if (isset($params['unit_amount'])) {
                 $params['unit_amount'] = (int)$params['unit_amount'];
             }
-            if ($method === 'get') {
+            if ($method === 'get' && $id) {
+                if (!isset($this->prices[$id])) {
+                    return $this->missing_resource('price');
+                }
+                $response = $this->prices[$id];
+            } else if ($method === 'get') {
                 $response = $this->collection(array_values(array_filter(
                     $this->prices,
-                    static fn($price) => $price['product'] === $params['product']
+                    static fn($price) => !isset($params['product']) || $price['product'] === $params['product']
                 )));
             } else {
                 $id ??= 'price_' . (count($this->prices) + 1);
                 $response = $this->prices[$id] = array_replace($this->prices[$id] ??
-                    ['id' => $id, 'object' => 'price', 'active' => true, 'type' => 'one_time'], $params);
+                    ['id' => $id, 'object' => 'price', 'active' => true,
+                        'type' => isset($params['recurring']) ? 'recurring' : 'one_time',
+                        'tax_behavior' => 'unspecified'], $params);
             }
         } else if ($resource === 'invoices') {
             if ($method === 'post' && !$id) {
@@ -206,7 +261,7 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
             throw new \RuntimeException('Unexpected Stripe call: ' . $method . ' ' . $path);
         }
         if ($key) {
-            $this->keys[$key] = ['params' => $params, 'response' => $response];
+            $this->keys[$key] = ['params' => $requestparams, 'response' => $response];
         }
         if ($this->lose === $path) {
             $this->lose = '';
@@ -215,10 +270,32 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
         return [json_encode($response), 200, []];
     }
 
+    /**
+     * Build a Stripe list response.
+     *
+     * @param array $data Resource data
+     * @return array List response
+     */
     private function collection(array $data): array {
         return ['object' => 'list', 'data' => $data, 'has_more' => false, 'url' => '/v1/test'];
     }
 
+    /**
+     * Build a resource-missing API error response.
+     *
+     * @param string $resource Resource type
+     * @return array Response body, HTTP status and headers
+     */
+    private function missing_resource(string $resource): array {
+        return [json_encode(['error' => ['type' => 'invalid_request_error', 'code' => 'resource_missing',
+            'message' => 'No such ' . $resource]]), 404, []];
+    }
+
+    /**
+     * Mark an invoice as fully paid.
+     *
+     * @param string $id Invoice ID
+     */
     public function paid(string $id): void {
         $this->invoices[$id]['status'] = 'paid';
         $this->invoices[$id]['amount_remaining'] = 0;

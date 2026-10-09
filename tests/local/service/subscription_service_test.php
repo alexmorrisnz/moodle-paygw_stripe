@@ -27,28 +27,35 @@ declare(strict_types=1);
 
 namespace paygw_stripe\local\service;
 
-use advanced_testcase;
+defined('MOODLE_INTERNAL') || die();
+
 use paygw_stripe\local\model\subscription as subscription_model;
+use paygw_stripe\tests\fixtures\stripe_testcase;
 use ReflectionMethod;
 use ReflectionProperty;
-use Stripe\Checkout\Session as StripeSession;
+use Stripe\Checkout\Session;
 use Stripe\Customer;
-use Stripe\Price;
 use Stripe\Product;
-use Stripe\StripeClient;
+use Stripe\Price;
+use Stripe\Subscription;
+use Stripe\Service\SubscriptionService;
+use Stripe\Service\CustomerService;
+use Stripe\Service\ProductService;
+use Stripe\Service\PriceService;
+use Stripe\Service\Checkout\CheckoutServiceFactory;
+use Stripe\Service\Checkout\SessionService;
+use Stripe\Service\BillingPortal\BillingPortalServiceFactory;
+use Stripe\Service\BillingPortal\SessionService as PortalSessionService;
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
+require_once(__DIR__ . '/../../fixtures/stripe_testcase.php');
+require_once(__DIR__ . '/../../fixtures/subscription_test_session_factory.php');
 
 /**
  * Tests for subscription_service.
+ *
+ * @covers \paygw_stripe\local\service\subscription_service
  */
-final class subscription_service_test extends advanced_testcase {
-    protected function setUp(): void {
-        parent::setUp();
-        $this->resetAfterTest();
-    }
-
+final class subscription_service_test extends stripe_testcase {
     /**
      * Tests subscription checkout payload includes trial configuration details.
      */
@@ -64,11 +71,25 @@ final class subscription_service_test extends advanced_testcase {
         ]);
         $this->setUser($user);
 
-        $client = new subscription_test_fake_client();
-        $productpricingservice = new subscription_test_fake_product_pricing_service();
-        $customerservice = new subscription_test_fake_customer_service();
-        $webhookservice = new subscription_test_fake_webhook_service();
-        $service = new subscription_service($client);
+        $productpricingservice = $this->createMock(product_pricing_service::class);
+        $customerservice = $this->createMock(customer_service::class);
+        $customerservice->expects($this->once())->method('get_customer')->with($user->id)->willReturn(null);
+        $customerservice->expects($this->once())->method('create_customer')
+            ->with($this->callback(static fn(object $actual): bool => $actual->id === $user->id))
+            ->willReturn(Customer::constructFrom(['id' => 'cus_test_1']));
+        $customerservice->expects($this->never())->method('update_customer_details');
+        $webhookservice = $this->createMock(webhook_service::class);
+        $webhookservice->expects($this->once())->method('create_webhook')->with(777)->willReturn(true);
+        $checkout = $this->mock_stripe_service('checkout', CheckoutServiceFactory::class);
+        $sessions = $this->createMock(SessionService::class);
+        $checkout->method('__get')->with('sessions')->willReturn($sessions);
+        $payload = [];
+        $sessions->expects($this->once())->method('create')
+            ->willReturnCallback(function (array $params) use (&$payload): Session {
+                $payload = $params;
+                return Session::constructFrom(['id' => 'cs_test_1']);
+            });
+        $service = new subscription_service($this->client);
         $this->set_private_property($service, 'productpricingservice', $productpricingservice);
         $this->set_private_property($service, 'customerservice', $customerservice);
         $this->set_private_property($service, 'webhookservice', $webhookservice);
@@ -86,10 +107,23 @@ final class subscription_service_test extends advanced_testcase {
             'anchorbilling' => 0,
             'firstintervalfree' => 1,
         ];
+        $payable = new \core_payment\local\entities\payable(20.00, 'USD', 777);
+        $productpricingservice->expects($this->once())->method('create_product_and_price')
+            ->with(
+                $config,
+                $payable,
+                'Monthly Stripe Product',
+                20.00,
+                'enrol_fee',
+                'fee',
+                '84',
+                ['interval' => 'month', 'interval_count' => 1]
+            )
+            ->willReturn([Product::constructFrom(['id' => 'prod_test_1']), Price::constructFrom(['id' => 'price_test_1'])]);
 
         $sessionid = $service->generate_subscription(
             $config,
-            new \core_payment\local\entities\payable(20.00, 'USD', 777),
+            $payable,
             'Monthly Stripe Product',
             20.00,
             'enrol_fee',
@@ -98,7 +132,6 @@ final class subscription_service_test extends advanced_testcase {
         );
 
         $this->assertSame('cs_test_1', $sessionid);
-        $payload = $client->checkout->sessions->createdpayloads[0];
         $this->assertSame('subscription', $payload['mode']);
         $this->assertSame('en', $payload['locale']);
         $this->assertSame('pmc_test_1', $payload['payment_method_configuration']);
@@ -107,9 +140,8 @@ final class subscription_service_test extends advanced_testcase {
         $this->assertGreaterThan(time(), $payload['subscription_data']['trial_end']);
         $this->assertSame('cus_test_1', $payload['customer']);
         $this->assertSame('price_test_1', $payload['line_items'][0]['price']->id);
-        $this->assertSame([777], $webhookservice->createdfor);
-        $this->assertSame([$user->id], $customerservice->createdusers);
-        $this->assertNotEmpty($productpricingservice->lastargs);
+        $this->assertSame($USER->id, $payload['metadata']['userid']);
+        $this->assertSame($payload['metadata'], $payload['subscription_data']['metadata']);
     }
 
     /**
@@ -121,9 +153,12 @@ final class subscription_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $client = new subscription_test_fake_client();
-        $client->subscriptions->retrieved['sub_test_1'] = (object)['id' => 'sub_test_1', 'status' => 'active'];
-        $service = new subscription_service($client);
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->exactly(2))->method('retrieve')->with('sub_test_1')->willReturn(
+            Subscription::constructFrom(['id' => 'sub_test_1', 'status' => 'active']),
+            Subscription::constructFrom(['id' => 'sub_test_1', 'status' => 'past_due'])
+        );
+        $service = new subscription_service($this->client);
 
         $session = subscription_test_session_factory::subscription_session(
             'cs_sub_1',
@@ -138,7 +173,6 @@ final class subscription_service_test extends advanced_testcase {
         $this->assertSame((int)$USER->id, (int)$record->userid);
         $this->assertSame('active', $record->status);
 
-        $client->subscriptions->retrieved['sub_test_1'] = (object)['id' => 'sub_test_1', 'status' => 'past_due'];
         $service->save_subscription($session);
 
         $updated = $DB->get_record('paygw_stripe_subscriptions', ['subscriptionid' => 'sub_test_1'], '*', MUST_EXIST);
@@ -149,13 +183,15 @@ final class subscription_service_test extends advanced_testcase {
      * Tests get_subscription_status returns the linked subscription status.
      */
     public function test_get_subscription_status_returns_status(): void {
-        $client = new subscription_test_fake_client();
-        $client->checkout->sessions->retrieved['cs_paid'] = (object)[
-            'id' => 'cs_paid',
-            'subscription' => 'sub_test_2',
-        ];
-        $client->subscriptions->retrieved['sub_test_2'] = (object)['id' => 'sub_test_2', 'status' => 'active'];
-        $service = new subscription_service($client);
+        $checkout = $this->mock_stripe_service('checkout', CheckoutServiceFactory::class);
+        $sessions = $this->createMock(SessionService::class);
+        $checkout->method('__get')->with('sessions')->willReturn($sessions);
+        $sessions->expects($this->once())->method('retrieve')->with('cs_paid')
+            ->willReturn(Session::constructFrom(['id' => 'cs_paid', 'subscription' => 'sub_test_2']));
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->once())->method('retrieve')->with('sub_test_2')
+            ->willReturn(Subscription::constructFrom(['id' => 'sub_test_2', 'status' => 'active']));
+        $service = new subscription_service($this->client);
 
         $this->assertSame('active', $service->get_subscription_status('cs_paid'));
     }
@@ -164,27 +200,48 @@ final class subscription_service_test extends advanced_testcase {
      * Tests load_portal creates the billing portal session with the expected payload.
      */
     public function test_load_portal_creates_billing_portal_session(): void {
-        $client = new subscription_test_fake_client();
-        $client->subscriptions->retrieved['sub_test_3'] = (object)[
-            'id' => 'sub_test_3',
-            'customer' => 'cus_test_3',
-        ];
-        $client->customers->retrieved['cus_test_3'] = Customer::constructFrom(['id' => 'cus_test_3']);
-        $service = new subscription_service($client);
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->once())->method('retrieve')->with('sub_test_3')
+            ->willReturn(Subscription::constructFrom(['id' => 'sub_test_3', 'customer' => 'cus_test_3']));
+        $customer = Customer::constructFrom(['id' => 'cus_test_3']);
+        $customers = $this->mock_stripe_service('customers', CustomerService::class);
+        $customers->expects($this->once())->method('retrieve')->with('cus_test_3')->willReturn($customer);
+        $portal = $this->mock_stripe_service('billingPortal', BillingPortalServiceFactory::class);
+        $sessions = $this->createMock(PortalSessionService::class);
+        $portal->method('__get')->with('sessions')->willReturn($sessions);
+        $payload = [];
+        $sessions->expects($this->once())->method('create')
+            ->willReturnCallback(function (array $params) use (&$payload): \Stripe\BillingPortal\Session {
+                $payload = $params;
+                return \Stripe\BillingPortal\Session::constructFrom(['id' => 'bps_1', 'url' => 'https://example.test/portal']);
+            });
+        $service = new subscription_service($this->client);
 
         $subscription = new subscription_model(1, 42, 'sub_test_3', 'cus_test_3', 'active', 'prod_test_a', 'price_test_a');
         $service->load_portal($subscription);
 
-        $payload = $client->billingPortal->sessions->createdpayloads[0];
         $this->assertSame('payment_method_update', $payload['flow_data']['type']);
-        $this->assertSame('cus_test_3', $payload['customer']->id);
-        $this->assertNotEmpty($client->billingPortal->sessions->createdurls);
+        $this->assertSame($customer, $payload['customer']);
+        $this->assertStringContainsString('/payment/gateway/stripe/subscriptions.php', $payload['return_url']);
+        $this->assertSame($payload['return_url'], $payload['flow_data']['after_completion']['redirect']['return_url']);
     }
 
     /**
-     * Tests cancel_subscription updates stored status without cancelling in Stripe.
+     * Provide remote cancellation and webhook-driven status synchronization.
+     *
+     * @return array Cancellation modes
      */
-    public function test_cancel_subscription_updates_status_without_remote_cancel(): void {
+    public static function cancellation_provider(): array {
+        return ['remote cancellation' => [true], 'webhook synchronization' => [false]];
+    }
+
+    /**
+     * Tests cancellation updates stored status using the appropriate SDK method.
+     *
+     * @dataProvider cancellation_provider
+     * @param bool $cancelstripe Whether to cancel remotely
+     */
+    public function test_cancel_subscription_updates_status(bool $cancelstripe): void {
         global $DB;
 
         $user = $this->getDataGenerator()->create_user();
@@ -203,9 +260,11 @@ final class subscription_service_test extends advanced_testcase {
             'priceid' => 'price_cancel_1',
         ]);
 
-        $client = new subscription_test_fake_client();
-        $client->subscriptions->retrieved['sub_cancel_1'] = (object)['id' => 'sub_cancel_1', 'status' => 'canceled'];
-        $service = new subscription_service($client);
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->once())->method($cancelstripe ? 'cancel' : 'retrieve')->with('sub_cancel_1')
+            ->willReturn(Subscription::constructFrom(['id' => 'sub_cancel_1', 'status' => 'canceled']));
+        $subscriptions->expects($this->never())->method($cancelstripe ? 'retrieve' : 'cancel');
+        $service = new subscription_service($this->client);
 
         $moodlesub = new subscription_model(
             (int)$subid,
@@ -216,7 +275,7 @@ final class subscription_service_test extends advanced_testcase {
             'prod_cancel_1',
             'price_cancel_1'
         );
-        $service->cancel_subscription($moodlesub, false);
+        $service->cancel_subscription($moodlesub, $cancelstripe);
 
         $updated = $DB->get_record('paygw_stripe_subscriptions', ['id' => $subid], '*', MUST_EXIST);
         $this->assertSame('canceled', $updated->status);
@@ -227,20 +286,37 @@ final class subscription_service_test extends advanced_testcase {
      * Tests get_subscription_table_data returns a row for an active subscription.
      */
     public function test_get_subscription_table_data_returns_row(): void {
-        $client = new subscription_test_fake_client();
-        $client->products->retrieved['prod_test_1'] = Product::constructFrom(['id' => 'prod_test_1', 'name' => 'Course Access']);
-        $price = Price::constructFrom(['id' => 'price_test_1', 'unit_amount' => 1234, 'currency' => 'USD']);
-        $price->recurring = (object)['interval' => 'month', 'interval_count' => 1];
-        $client->prices->retrieved['price_test_1'] = $price;
-        $client->subscriptions->retrieved['sub_test_1'] = (object)[
+        $products = $this->mock_stripe_service('products', ProductService::class);
+        $products->expects($this->once())->method('retrieve')->with('prod_test_1')->willReturn(Product::constructFrom([
+            'id' => 'prod_test_1',
+            'object' => 'product',
+            'name' => 'Course Access',
+        ]));
+        $prices = $this->mock_stripe_service('prices', PriceService::class);
+        $prices->expects($this->once())->method('retrieve')->with('price_test_1')->willReturn(Price::constructFrom([
+            'id' => 'price_test_1',
+            'object' => 'price',
+            'unit_amount' => 1234,
+            'currency' => 'USD',
+            'recurring' => ['interval' => 'month', 'interval_count' => 1],
+        ]));
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->once())->method('retrieve')
+            ->with('sub_test_1', ['expand' => ['schedule']])->willReturn(Subscription::constructFrom([
             'id' => 'sub_test_1',
-            'items' => (object)[
-                'data' => [
-                    (object)['current_period_end' => time() + 3600],
-                ],
+            'object' => 'subscription',
+            'items' => [
+                'object' => 'list',
+                'data' => [[
+                    'id' => 'si_test_1',
+                    'object' => 'subscription_item',
+                    'current_period_end' => time() + 3600,
+                ]],
+                'has_more' => false,
+                'url' => '/v1/subscription_items?subscription=sub_test_1',
             ],
-        ];
-        $service = new subscription_service($client);
+        ]));
+        $service = new subscription_service($this->client);
 
         $moodlesub = new subscription_model(1, 42, 'sub_test_1', 'cus_test_1', 'active', 'prod_test_1', 'price_test_1');
 
@@ -255,7 +331,7 @@ final class subscription_service_test extends advanced_testcase {
      * Tests localised cost keeps currency amount semantics for decimal and zero-decimal currencies.
      */
     public function test_get_localised_cost_preserves_amount_semantics(): void {
-        $service = new subscription_service(new subscription_test_fake_client());
+        $service = new subscription_service($this->client);
 
         $usd = $service->get_localised_cost(1234.0, 'USD');
         $jpy = $service->get_localised_cost(123.0, 'JPY');
@@ -305,7 +381,7 @@ final class subscription_service_test extends advanced_testcase {
         ?int $customcount,
         array $expected
     ): void {
-        $service = new subscription_service(new subscription_test_fake_client());
+        $service = new subscription_service($this->client);
         $config = (object)[
             'subscriptioninterval' => $interval,
             'customsubscriptioninterval' => $custominterval,
@@ -345,7 +421,7 @@ final class subscription_service_test extends advanced_testcase {
         ?string $custominterval,
         ?int $customcount
     ): void {
-        $service = new subscription_service(new subscription_test_fake_client());
+        $service = new subscription_service($this->client);
         $config = (object)[
             'subscriptioninterval' => $interval,
             'customsubscriptioninterval' => $custominterval,
@@ -386,7 +462,7 @@ final class subscription_service_test extends advanced_testcase {
         ?string $custominterval,
         ?int $customcount
     ): void {
-        $service = new subscription_service(new subscription_test_fake_client());
+        $service = new subscription_service($this->client);
         $config = (object)[
             'subscriptioninterval' => $interval,
             'customsubscriptioninterval' => $custominterval,
@@ -425,253 +501,5 @@ final class subscription_service_test extends advanced_testcase {
         $property = new ReflectionProperty($object, $name);
         $property->setAccessible(true);
         $property->setValue($object, $value);
-    }
-}
-
-/**
- * Minimal fake Stripe client for unit testing subscription_service without network calls.
- */
-final class subscription_test_fake_client extends StripeClient {
-    /** @var subscription_test_fake_checkout_sessions_service */
-    public $checkout;
-    /** @var subscription_test_fake_subscriptions_service */
-    public $subscriptions;
-    /** @var subscription_test_fake_customers_service */
-    public $customers;
-    /** @var subscription_test_fake_products_service */
-    public $products;
-    /** @var subscription_test_fake_prices_service */
-    public $prices;
-    /** @var subscription_test_fake_billing_portal_service */
-    public $billingPortal;
-
-    public function __construct() {
-        $this->checkout = (object)['sessions' => new subscription_test_fake_checkout_sessions_service()];
-        $this->subscriptions = new subscription_test_fake_subscriptions_service();
-        $this->customers = new subscription_test_fake_customers_service();
-        $this->products = new subscription_test_fake_products_service();
-        $this->prices = new subscription_test_fake_prices_service();
-        $this->billingPortal = new subscription_test_fake_billing_portal_service();
-    }
-}
-
-/**
- * Fake checkout sessions service.
- */
-final class subscription_test_fake_checkout_sessions_service {
-    /** @var array */
-    public $createdpayloads = [];
-    /** @var array */
-    public $retrieved = [];
-
-    public function create(array $payload): object {
-        $this->createdpayloads[] = $payload;
-        return (object)['id' => 'cs_test_' . count($this->createdpayloads)];
-    }
-
-    public function retrieve(string $sessionid, array $params = []): object {
-        return $this->retrieved[$sessionid] ?? (object)[
-            'id' => $sessionid,
-            'subscription' => 'sub_default',
-        ];
-    }
-}
-
-/**
- * Fake subscription service.
- */
-final class subscription_test_fake_subscriptions_service {
-    /** @var array */
-    public $retrieved = [];
-    /** @var array */
-    public $canceled = [];
-
-    public function retrieve(string $subscriptionid, array $params = []): object {
-        return $this->retrieved[$subscriptionid] ?? (object)['id' => $subscriptionid, 'status' => 'incomplete'];
-    }
-
-    public function cancel(string $subscriptionid): object {
-        $this->canceled[] = $subscriptionid;
-        return (object)['id' => $subscriptionid, 'status' => 'canceled'];
-    }
-}
-
-/**
- * Fake customers service.
- */
-final class subscription_test_fake_customers_service {
-    /** @var array */
-    public $retrieved = [];
-
-    public function retrieve(string $customerid): Customer {
-        return $this->retrieved[$customerid] ?? Customer::constructFrom(['id' => $customerid]);
-    }
-}
-
-/**
- * Fake products service.
- */
-final class subscription_test_fake_products_service {
-    /** @var array */
-    public $retrieved = [];
-
-    public function retrieve(string $productid): Product {
-        return $this->retrieved[$productid] ?? Product::constructFrom(['id' => $productid, 'name' => 'Recovered']);
-    }
-}
-
-/**
- * Fake prices service.
- */
-final class subscription_test_fake_prices_service {
-    /** @var array */
-    public $retrieved = [];
-
-    public function retrieve(string $priceid): Price {
-        return $this->retrieved[$priceid] ?? Price::constructFrom([
-            'id' => $priceid,
-            'unit_amount' => 0,
-            'currency' => 'USD',
-            'recurring' => (object)['interval' => 'month', 'interval_count' => 1],
-        ]);
-    }
-}
-
-/**
- * Fake billing portal service.
- */
-final class subscription_test_fake_billing_portal_service {
-    /** @var subscription_test_fake_billing_portal_sessions_service */
-    public $sessions;
-
-    public function __construct() {
-        $this->sessions = new subscription_test_fake_billing_portal_sessions_service();
-    }
-}
-
-/**
- * Fake billing portal sessions service.
- */
-final class subscription_test_fake_billing_portal_sessions_service {
-    /** @var array */
-    public $createdpayloads = [];
-    /** @var array */
-    public $createdurls = [];
-
-    public function create(array $payload): object {
-        $this->createdpayloads[] = $payload;
-        $url = 'https://example.test/portal/' . count($this->createdpayloads);
-        $this->createdurls[] = $url;
-        return (object)['url' => $url];
-    }
-}
-
-/**
- * Fake product pricing service.
- */
-final class subscription_test_fake_product_pricing_service extends product_pricing_service {
-    /** @var array */
-    public $lastargs = [];
-
-    public function __construct() {
-    }
-
-    public function create_product_and_price(
-        object $config,
-        \core_payment\local\entities\payable $payable,
-        string $description,
-        float $cost,
-        string $component,
-        string $paymentarea,
-        string $itemid,
-        ?array $subscription = null
-    ) {
-        $this->lastargs = func_get_args();
-        $product = Product::constructFrom(['id' => 'prod_test_1', 'name' => $description]);
-        $price = Price::constructFrom(['id' => 'price_test_1']);
-        return [$product, $price];
-    }
-}
-
-/**
- * Fake customer service.
- */
-final class subscription_test_fake_customer_service extends customer_service {
-    /** @var array */
-    public $createdusers = [];
-
-    public function __construct() {
-    }
-
-    public function get_customer(int $userid): ?Customer {
-        return null;
-    }
-
-    public function create_customer($user): Customer {
-        $this->createdusers[] = $user->id;
-        return Customer::constructFrom(['id' => 'cus_test_1']);
-    }
-
-    public function update_customer_details(Customer $customer, $user) {
-        return Customer::constructFrom(['id' => $customer->id]);
-    }
-}
-
-/**
- * Fake webhook service.
- */
-final class subscription_test_fake_webhook_service extends webhook_service {
-    /** @var array */
-    public $createdfor = [];
-
-    public function __construct() {
-    }
-
-    public function create_webhook(int $paymentaccountid): bool {
-        $this->createdfor[] = $paymentaccountid;
-        return true;
-    }
-}
-
-/**
- * Session factory for subscription tests.
- */
-final class subscription_test_session_factory {
-    public static function subscription_session(
-        string $sessionid,
-        string $subscriptionid,
-        string $customerid,
-        string $productid,
-        string $priceid
-    ): StripeSession {
-        $session = StripeSession::constructFrom([
-            'id' => $sessionid,
-            'mode' => 'subscription',
-            'subscription' => $subscriptionid,
-        ]);
-        $session->customer = (object)['id' => $customerid];
-        $session->line_items = new subscription_test_line_items($productid, $priceid);
-        return $session;
-    }
-}
-
-/**
- * Line item collection stub supporting first().
- */
-final class subscription_test_line_items {
-    /** @var object */
-    private $first;
-
-    public function __construct(string $productid, string $priceid) {
-        $this->first = (object)[
-            'price' => (object)[
-                'product' => $productid,
-                'id' => $priceid,
-            ],
-        ];
-    }
-
-    public function first(): object {
-        return $this->first;
     }
 }

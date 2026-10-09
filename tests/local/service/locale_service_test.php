@@ -63,6 +63,7 @@ final class locale_service_test extends advanced_testcase {
      * @dataProvider locale_mapping_provider
      * @param string $moodlelang
      * @param string $expected
+     * @covers \paygw_stripe\local\service\locale_service::map_moodle_lang_to_stripe_locale
      */
     public function test_map_moodle_lang_to_stripe_locale(string $moodlelang, string $expected): void {
         set_config('forcedlocale', '', 'paygw_stripe');
@@ -73,6 +74,7 @@ final class locale_service_test extends advanced_testcase {
 
     /**
      * Tests forced locale overrides language mapping.
+     * @covers \paygw_stripe\local\service\locale_service::map_moodle_lang_to_stripe_locale
      */
     public function test_map_moodle_lang_to_stripe_locale_forced_config(): void {
         set_config('forcedlocale', 'fr-CA', 'paygw_stripe');
@@ -83,6 +85,7 @@ final class locale_service_test extends advanced_testcase {
 
     /**
      * Tests get_stripe_locale_for_user with explicit user language.
+     * @covers \paygw_stripe\local\service\locale_service::get_stripe_locale_for_user
      */
     public function test_get_stripe_locale_for_user_uses_user_language(): void {
         set_config('forcedlocale', '', 'paygw_stripe');
@@ -94,6 +97,7 @@ final class locale_service_test extends advanced_testcase {
 
     /**
      * Tests get_stripe_locale_for_user falls back when user language is empty.
+     * @covers \paygw_stripe\local\service\locale_service::get_stripe_locale_for_user
      */
     public function test_get_stripe_locale_for_user_falls_back_to_current_language(): void {
         set_config('forcedlocale', '', 'paygw_stripe');

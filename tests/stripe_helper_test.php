@@ -27,33 +27,29 @@ declare(strict_types=1);
 
 namespace paygw_stripe;
 
-use advanced_testcase;
+defined('MOODLE_INTERNAL') || die();
+
 use paygw_stripe\local\service\subscription_service;
+use paygw_stripe\tests\fixtures\stripe_testcase;
 use ReflectionProperty;
 use Stripe\Event;
-use Stripe\StripeClient;
+use Stripe\Service\SubscriptionService;
+use Stripe\Subscription;
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
+require_once(__DIR__ . '/fixtures/stripe_testcase.php');
 
 /**
  * Tests for stripe_helper deterministic behaviour.
+ *
+ * @covers \paygw_stripe\stripe_helper
  */
-final class stripe_helper_test extends advanced_testcase {
-    /**
-     * Reset config and db state after each test.
-     */
-    protected function setUp(): void {
-        parent::setUp();
-        $this->resetAfterTest();
-    }
-
+final class stripe_helper_test extends stripe_testcase {
     /**
      * Tests process_stripe_event rejects malformed and unsupported event types.
      */
     public function test_process_stripe_event_rejects_invalid_payloads(): void {
         $helper = $this->get_helper_without_constructor();
-        $this->set_private_property($helper, 'stripe', new stripe_test_fake_client());
+        $this->set_private_property($helper, 'stripe', $this->client);
 
         $missingobject = Event::constructFrom([
             'id' => 'evt_missing',
@@ -87,8 +83,10 @@ final class stripe_helper_test extends advanced_testcase {
         ]);
 
         $helper = $this->get_helper_without_constructor();
-        $stripeclient = new stripe_test_fake_client();
-        $stripeclient->subscriptions->retrieved['sub_evt_1'] = (object)['id' => 'sub_evt_1', 'status' => 'active'];
+        $stripeclient = $this->client;
+        $subscriptions = $this->mock_stripe_service('subscriptions', SubscriptionService::class);
+        $subscriptions->expects($this->once())->method('retrieve')->with('sub_evt_1')
+            ->willReturn(Subscription::constructFrom(['id' => 'sub_evt_1', 'status' => 'active']));
         $this->set_private_property($helper, 'stripe', $stripeclient);
         $this->set_private_property($helper, 'subscriptionservice', new subscription_service($stripeclient));
 
@@ -120,9 +118,20 @@ final class stripe_helper_test extends advanced_testcase {
         ]);
 
         $helper = $this->get_helper_without_constructor();
-        $stripeclient = new stripe_test_fake_client();
+        $stripeclient = $this->client;
         $this->set_private_property($helper, 'stripe', $stripeclient);
-        $subscriptionservice = new stripe_test_fake_subscription_service($stripeclient);
+        $subscriptionservice = $this->getMockBuilder(subscription_service::class)
+            ->setConstructorArgs([$stripeclient])
+            ->onlyMethods(['cancel_subscription'])
+            ->getMock();
+        $subscriptionservice->expects($this->once())->method('cancel_subscription')->with(
+            $this->callback(function ($subscription) use ($user): bool {
+                $this->assertSame('sub_evt_delete', $subscription->subscriptionid);
+                $this->assertEquals($user->id, $subscription->userid);
+                return true;
+            }),
+            false
+        );
         $this->set_private_property($helper, 'subscriptionservice', $subscriptionservice);
 
         $event = Event::constructFrom([
@@ -132,10 +141,6 @@ final class stripe_helper_test extends advanced_testcase {
         ]);
 
         $this->assertTrue($helper->process_stripe_event($event, []));
-        $this->assertCount(1, $subscriptionservice->cancelcalls);
-        $this->assertSame('sub_evt_delete', $subscriptionservice->cancelcalls[0][0]->subscriptionid);
-        $this->assertEquals($user->id, $subscriptionservice->cancelcalls[0][0]->userid);
-        $this->assertFalse($subscriptionservice->cancelcalls[0][1]);
     }
 
     /**
@@ -159,83 +164,5 @@ final class stripe_helper_test extends advanced_testcase {
         $property = new ReflectionProperty(stripe_helper::class, $name);
         $property->setAccessible(true);
         $property->setValue($helper, $value);
-    }
-}
-
-/**
- * Fake subscription service recording cancellation delegation.
- */
-final class stripe_test_fake_subscription_service extends subscription_service {
-    /** @var array Recorded cancel_subscription() calls. */
-    public $cancelcalls = [];
-
-    /**
-     * Record the cancellation instead of calling Stripe.
-     *
-     * @param \paygw_stripe\local\model\subscription $moodlesub
-     * @param bool $cancelstripe
-     * @return void
-     */
-    public function cancel_subscription(\paygw_stripe\local\model\subscription $moodlesub, bool $cancelstripe = true) {
-        $this->cancelcalls[] = [$moodlesub, $cancelstripe];
-    }
-}
-
-/**
- * Minimal fake Stripe client for unit testing stripe_helper without network calls.
- */
-final class stripe_test_fake_client extends StripeClient {
-    /** @var object */
-    public $checkout;
-    /** @var stripe_test_fake_subscriptions_service */
-    public $subscriptions;
-
-    public function __construct() {
-        $this->subscriptions = new stripe_test_fake_subscriptions_service();
-        $this->checkout = (object)[
-            'sessions' => new stripe_test_fake_checkout_sessions_service(),
-        ];
-    }
-}
-
-/**
- * Fake checkout sessions service.
- */
-final class stripe_test_fake_checkout_sessions_service {
-    /** @var array */
-    public $retrieved = [];
-
-    /**
-     * @param string $sessionid
-     * @param array $params
-     * @return object
-     */
-    public function retrieve(string $sessionid, array $params = []): object {
-        if (isset($this->retrieved[$sessionid])) {
-            return $this->retrieved[$sessionid];
-        }
-        return (object)[
-            'id' => $sessionid,
-            'mode' => 'payment',
-            'payment_status' => 'unpaid',
-            'payment_intent' => (object)['status' => 'requires_payment_method'],
-            'subscription' => 'sub_default',
-        ];
-    }
-}
-
-/**
- * Fake subscriptions service.
- */
-final class stripe_test_fake_subscriptions_service {
-    /** @var array */
-    public $retrieved = [];
-
-    /**
-     * @param string $id
-     * @return object
-     */
-    public function retrieve(string $id): object {
-        return $this->retrieved[$id] ?? (object)['id' => $id, 'status' => 'incomplete'];
     }
 }

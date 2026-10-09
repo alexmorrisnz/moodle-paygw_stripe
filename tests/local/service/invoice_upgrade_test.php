@@ -18,44 +18,24 @@ declare(strict_types=1);
 
 namespace paygw_stripe\local\service;
 
-use advanced_testcase;
-use paygw_stripe\local\repository\invoice_repository;
-use paygw_stripe\stripe_helper;
-use paygw_stripe\tests\fixtures\invoice_http_client;
-use Stripe\ApiRequestor;
-use Stripe\StripeClient;
+defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
-require_once(__DIR__ . '/fixtures/invoice_http_client.php');
+use paygw_stripe\local\repository\invoice_repository;
+use paygw_stripe\tests\fixtures\invoice_testcase;
+
+require_once(__DIR__ . '/../../fixtures/invoice_testcase.php');
 
 /**
  * Exercises guarded Moodle XMLDB upgrade paths without altering the PHPUnit schema.
  *
  * @package paygw_stripe
  * @category test
+ * @covers ::xmldb_paygw_stripe_upgrade
+ * @covers \paygw_stripe\local\service\invoice_service
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class invoice_upgrade_test extends advanced_testcase {
-    private $originalhttpclient;
-    private invoice_http_client $http;
-
-    protected function setUp(): void {
-        parent::setUp();
-        $this->resetAfterTest();
-        $property = new \ReflectionProperty(ApiRequestor::class, '_httpClient');
-        $property->setAccessible(true);
-        $this->originalhttpclient = $property->getValue();
-        $this->http = new invoice_http_client();
-        ApiRequestor::setHttpClient($this->http);
-    }
-
-    protected function tearDown(): void {
-        ApiRequestor::setHttpClient($this->originalhttpclient);
-        parent::tearDown();
-    }
-
+final class invoice_upgrade_test extends invoice_testcase {
     public function test_invoice_upgrade_preserves_legacy_defaults_and_does_not_email_old_invoices(): void {
         global $CFG, $DB;
 
@@ -144,10 +124,7 @@ final class invoice_upgrade_test extends advanced_testcase {
                 'itemid' => '42',
             ],
         ];
-        $service = new invoice_service(new StripeClient([
-            'api_key' => 'sk_test_fake',
-            'stripe_version' => stripe_helper::$apiversion,
-        ]));
+        $service = new invoice_service($this->client);
         $this->assertSame(
             'https://invoice.stripe.com/' . $invoiceid,
             $service->complete_billing($id, $userid, $token)

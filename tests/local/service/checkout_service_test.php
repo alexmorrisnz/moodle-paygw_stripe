@@ -27,27 +27,28 @@ declare(strict_types=1);
 
 namespace paygw_stripe\local\service;
 
-use advanced_testcase;
-use core_payment\local\entities\payable;
-use ReflectionProperty;
-use Stripe\Checkout\Session as StripeSession;
-use Stripe\Customer;
-use Stripe\Price;
-use Stripe\Product;
-use Stripe\StripeClient;
+defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
+use core_payment\local\entities\payable;
+use paygw_stripe\tests\fixtures\stripe_testcase;
+use ReflectionProperty;
+use Stripe\Customer;
+use Stripe\Product;
+use Stripe\Price;
+use Stripe\Checkout\Session;
+use Stripe\Service\Checkout\CheckoutServiceFactory;
+use Stripe\Service\Checkout\SessionService;
+use PHPUnit\Framework\MockObject\MockObject;
+
+require_once(__DIR__ . '/../../fixtures/stripe_testcase.php');
+require_once(__DIR__ . '/../../fixtures/checkout_test_session_factory.php');
 
 /**
  * Tests for checkout_service.
+ *
+ * @covers \paygw_stripe\local\service\checkout_service
  */
-final class checkout_service_test extends advanced_testcase {
-    protected function setUp(): void {
-        parent::setUp();
-        $this->resetAfterTest();
-    }
-
+final class checkout_service_test extends stripe_testcase {
     /**
      * Tests generating a one-time payment checkout session with Stripe payload values.
      */
@@ -63,11 +64,22 @@ final class checkout_service_test extends advanced_testcase {
         ]);
         $this->setUser($user);
 
-        $client = new checkout_test_fake_client();
-        $productpricingservice = new checkout_test_fake_product_pricing_service();
-        $customerservice = new checkout_test_fake_customer_service();
-        $webhookservice = new checkout_test_fake_webhook_service();
-        $service = new checkout_service($client);
+        $productpricingservice = $this->createMock(product_pricing_service::class);
+        $customerservice = $this->createMock(customer_service::class);
+        $customerservice->expects($this->once())->method('get_customer')->with($user->id)->willReturn(null);
+        $customerservice->expects($this->once())->method('create_customer')
+            ->with($this->callback(static fn(object $actual): bool => $actual->id === $user->id))
+            ->willReturn(Customer::constructFrom(['id' => 'cus_test_1']));
+        $customerservice->expects($this->never())->method('update_customer_details');
+        $webhookservice = $this->createMock(webhook_service::class);
+        $webhookservice->expects($this->once())->method('create_webhook')->with(123)->willReturn(true);
+        $payload = [];
+        $this->mock_sessions()->expects($this->once())->method('create')
+            ->willReturnCallback(function (array $params) use (&$payload): Session {
+                $payload = $params;
+                return checkout_test_session_factory::payment_session('cs_test_1', 'open', 'unpaid');
+            });
+        $service = new checkout_service($this->client);
         $this->set_private_property($service, 'productpricingservice', $productpricingservice);
         $this->set_private_property($service, 'customerservice', $customerservice);
         $this->set_private_property($service, 'webhookservice', $webhookservice);
@@ -80,10 +92,14 @@ final class checkout_service_test extends advanced_testcase {
             'invoicecreation' => 1,
             'allowpromotioncodes' => 1,
         ];
+        $payable = new payable(10.50, 'USD', 123);
+        $productpricingservice->expects($this->once())->method('create_product_and_price')
+            ->with($config, $payable, 'Test Stripe Product', 10.50, 'enrol_fee', 'fee', '42')
+            ->willReturn([Product::constructFrom(['id' => 'prod_test_1']), Price::constructFrom(['id' => 'price_test_1'])]);
 
         $sessionid = $service->generate_payment(
             $config,
-            new payable(10.50, 'USD', 123),
+            $payable,
             'Test Stripe Product',
             10.50,
             'enrol_fee',
@@ -92,9 +108,6 @@ final class checkout_service_test extends advanced_testcase {
         );
 
         $this->assertSame('cs_test_1', $sessionid);
-        $this->assertCount(1, $client->checkout->sessions->createdpayloads);
-
-        $payload = $client->checkout->sessions->createdpayloads[0];
         $this->assertSame('payment', $payload['mode']);
         $this->assertSame('en', $payload['locale']);
         $this->assertSame('pmc_test_1', $payload['payment_method_configuration']);
@@ -113,10 +126,6 @@ final class checkout_service_test extends advanced_testcase {
         $this->assertGreaterThan(time(), $payload['expires_at']);
         $this->assertStringContainsString('component=enrol_fee', $payload['success_url']);
         $this->assertStringContainsString('component=enrol_fee', $payload['cancel_url']);
-
-        $this->assertSame([123], $webhookservice->createdfor);
-        $this->assertSame([$user->id], $customerservice->createdusers);
-        $this->assertNotEmpty($productpricingservice->lastargs);
     }
 
     /**
@@ -126,14 +135,29 @@ final class checkout_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $client = new checkout_test_fake_client();
-        $customerservice = new checkout_test_fake_customer_service();
-        $customerservice->existingcustomer = Customer::constructFrom(['id' => 'cus_existing']);
-        $service = new checkout_service($client);
-        $this->set_private_property($service, 'productpricingservice', new checkout_test_fake_product_pricing_service());
+        $customer = Customer::constructFrom(['id' => 'cus_existing']);
+        $customerservice = $this->createMock(customer_service::class);
+        $customerservice->expects($this->once())->method('get_customer')->with($user->id)->willReturn($customer);
+        $customerservice->expects($this->never())->method('create_customer');
+        $customerservice->expects($this->once())->method('update_customer_details')
+            ->with($customer, $this->callback(static fn(object $actual): bool => $actual->id === $user->id))
+            ->willReturn($customer);
+        $productpricingservice = $this->createMock(product_pricing_service::class);
+        $webhookservice = $this->createMock(webhook_service::class);
+        $webhookservice->expects($this->once())->method('create_webhook')->with(123)->willReturn(true);
+        $methodconfig = $this->createMock(payment_method_config_service::class);
+        $methodconfig->expects($this->once())->method('get_default_payment_method_config_id')->willReturn('pmc_default');
+        $payload = [];
+        $this->mock_sessions()->expects($this->once())->method('create')
+            ->willReturnCallback(function (array $params) use (&$payload): Session {
+                $payload = $params;
+                return checkout_test_session_factory::payment_session('cs_test_1', 'open', 'unpaid');
+            });
+        $service = new checkout_service($this->client);
+        $this->set_private_property($service, 'productpricingservice', $productpricingservice);
         $this->set_private_property($service, 'customerservice', $customerservice);
-        $this->set_private_property($service, 'webhookservice', new checkout_test_fake_webhook_service());
-        $this->set_private_property($service, 'paymentmethodconfigservice', new checkout_test_fake_payment_method_config_service());
+        $this->set_private_property($service, 'webhookservice', $webhookservice);
+        $this->set_private_property($service, 'paymentmethodconfigservice', $methodconfig);
 
         $config = (object)[
             'enableautomatictax' => 0,
@@ -141,10 +165,14 @@ final class checkout_service_test extends advanced_testcase {
             'paymentmethodconfiguration' => null,
             'allowpromotioncodes' => 0,
         ];
+        $payable = new payable(10.50, 'USD', 123);
+        $productpricingservice->expects($this->once())->method('create_product_and_price')
+            ->with($config, $payable, 'Test Stripe Product', 10.50, 'enrol_fee', 'fee', '42')
+            ->willReturn([Product::constructFrom(['id' => 'prod_test_1']), Price::constructFrom(['id' => 'price_test_1'])]);
 
         $service->generate_payment(
             $config,
-            new payable(10.50, 'USD', 123),
+            $payable,
             'Test Stripe Product',
             10.50,
             'enrol_fee',
@@ -152,36 +180,49 @@ final class checkout_service_test extends advanced_testcase {
             '42'
         );
 
-        $payload = $client->checkout->sessions->createdpayloads[0];
         $this->assertSame('auto', $payload['billing_address_collection']);
         $this->assertFalse($payload['automatic_tax']['enabled']);
         $this->assertFalse($payload['invoice_creation']['enabled']);
         $this->assertFalse($payload['allow_promotion_codes']);
         $this->assertSame('pmc_default', $payload['payment_method_configuration']);
         $this->assertSame('cus_existing', $payload['customer']);
-        $this->assertSame([], $customerservice->createdusers);
-        $this->assertSame(['cus_existing'], $customerservice->updatedcustomers);
     }
 
     /**
      * Tests helpers reading checkout states from Stripe data.
      */
     public function test_session_status_helpers_read_from_stripe_retrieval(): void {
-        $client = new checkout_test_fake_client();
-        $service = new checkout_service($client);
+        $service = new checkout_service($this->client);
 
-        $client->checkout->sessions->retrieved['cs_paid'] = (object)[
+        $paid = Session::constructFrom([
             'id' => 'cs_paid',
+            'object' => 'checkout.session',
             'mode' => 'payment',
             'payment_status' => 'paid',
-            'payment_intent' => (object)['status' => 'succeeded'],
-        ];
-        $client->checkout->sessions->retrieved['cs_processing'] = (object)[
+            'payment_intent' => ['id' => 'pi_paid', 'object' => 'payment_intent', 'status' => 'succeeded'],
+        ]);
+        $processing = Session::constructFrom([
             'id' => 'cs_processing',
+            'object' => 'checkout.session',
             'mode' => 'subscription',
             'payment_status' => 'unpaid',
-            'payment_intent' => (object)['status' => 'processing'],
+            'payment_intent' => ['id' => 'pi_processing', 'object' => 'payment_intent', 'status' => 'processing'],
+        ]);
+        $calls = [
+            ['cs_paid', null, $paid],
+            ['cs_processing', null, $processing],
+            ['cs_paid', null, $paid],
+            ['cs_processing', null, $processing],
+            ['cs_processing', ['expand' => ['payment_intent']], $processing],
+            ['cs_paid', ['expand' => ['payment_intent']], $paid],
         ];
+        $this->mock_sessions()->expects($this->exactly(6))->method('retrieve')
+            ->willReturnCallback(function (string $id, ?array $params = null) use (&$calls): Session {
+                [$expectedid, $expectedparams, $session] = array_shift($calls);
+                $this->assertSame($expectedid, $id);
+                $this->assertSame($expectedparams, $params);
+                return $session;
+            });
 
         $this->assertSame('payment', $service->get_sessionmode('cs_paid'));
         $this->assertSame('subscription', $service->get_sessionmode('cs_processing'));
@@ -200,7 +241,7 @@ final class checkout_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $service = new checkout_service(new checkout_test_fake_client());
+        $service = new checkout_service($this->client);
         $session = checkout_test_session_factory::payment_session('cs_save_1', 'open', 'unpaid');
 
         $service->save_checkout_session($session);
@@ -229,7 +270,7 @@ final class checkout_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $service = new checkout_service(new checkout_test_fake_client());
+        $service = new checkout_service($this->client);
 
         $this->assertFalse($service->is_checkout_session_saved('cs_unknown'));
 
@@ -247,22 +288,18 @@ final class checkout_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $client = new checkout_test_fake_client();
-        $client->checkout->sessions->retrieved['cs_status_1'] =
-            checkout_test_session_factory::payment_session('cs_status_1', 'complete', 'paid');
-        $subscriptionservice = new checkout_test_fake_subscription_service();
-        $service = new checkout_service($client);
+        $this->mock_sessions()->expects($this->once())->method('retrieve')
+            ->with('cs_status_1', ['expand' => ['line_items', 'customer']])
+            ->willReturn(checkout_test_session_factory::payment_session('cs_status_1', 'complete', 'paid'));
+        $subscriptionservice = $this->createMock(subscription_service::class);
+        $subscriptionservice->expects($this->never())->method('save_subscription');
+        $service = new checkout_service($this->client);
         $this->set_private_property($service, 'subscriptionservice', $subscriptionservice);
 
         $service->save_payment_status('cs_status_1');
 
         $record = $DB->get_record('paygw_stripe_checkout_sessions', ['checkoutsessionid' => 'cs_status_1'], '*', MUST_EXIST);
         $this->assertSame('paid', $record->paymentstatus);
-        $this->assertSame([], $subscriptionservice->savedsessions);
-        $this->assertSame(
-            [['cs_status_1', ['expand' => ['line_items', 'customer']]]],
-            $client->checkout->sessions->retrievecalls
-        );
     }
 
     /**
@@ -274,17 +311,29 @@ final class checkout_service_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $client = new checkout_test_fake_client();
-        $client->checkout->sessions->retrieved['cs_status_sub'] =
-            checkout_test_session_factory::subscription_session('cs_status_sub');
-        $subscriptionservice = new checkout_test_fake_subscription_service();
-        $service = new checkout_service($client);
+        $session = checkout_test_session_factory::subscription_session('cs_status_sub');
+        $this->mock_sessions()->expects($this->once())->method('retrieve')
+            ->with('cs_status_sub', ['expand' => ['line_items', 'customer']])->willReturn($session);
+        $subscriptionservice = $this->createMock(subscription_service::class);
+        $subscriptionservice->expects($this->once())->method('save_subscription')->with($session);
+        $service = new checkout_service($this->client);
         $this->set_private_property($service, 'subscriptionservice', $subscriptionservice);
 
         $service->save_payment_status('cs_status_sub');
 
-        $this->assertSame(['cs_status_sub'], $subscriptionservice->savedsessions);
         $this->assertFalse($DB->record_exists('paygw_stripe_checkout_sessions', ['checkoutsessionid' => 'cs_status_sub']));
+    }
+
+    /**
+     * Register the nested checkout sessions SDK service.
+     *
+     * @return MockObject Sessions service mock
+     */
+    private function mock_sessions(): MockObject {
+        $checkout = $this->mock_stripe_service('checkout', CheckoutServiceFactory::class);
+        $sessions = $this->createMock(SessionService::class);
+        $checkout->method('__get')->with('sessions')->willReturn($sessions);
+        return $sessions;
     }
 
     /**
@@ -299,244 +348,5 @@ final class checkout_service_test extends advanced_testcase {
         $property = new ReflectionProperty($object, $name);
         $property->setAccessible(true);
         $property->setValue($object, $value);
-    }
-}
-
-/**
- * Fake default payment method configuration lookup.
- */
-final class checkout_test_fake_payment_method_config_service extends payment_method_config_service {
-    public function __construct() {
-    }
-
-    public function get_default_payment_method_config_id(): ?string {
-        return 'pmc_default';
-    }
-}
-
-/**
- * Minimal fake Stripe client for unit testing checkout_service without network calls.
- */
-final class checkout_test_fake_client extends StripeClient {
-    /** @var object */
-    public $checkout;
-
-    public function __construct() {
-        $this->checkout = (object)['sessions' => new checkout_test_fake_checkout_sessions_service()];
-    }
-}
-
-/**
- * Fake checkout sessions service.
- */
-final class checkout_test_fake_checkout_sessions_service {
-    /** @var array */
-    public $createdpayloads = [];
-    /** @var array */
-    public $retrieved = [];
-    /** @var array */
-    public $retrievecalls = [];
-
-    /**
-     * @param array $payload
-     * @return StripeSession
-     */
-    public function create(array $payload): StripeSession {
-        $this->createdpayloads[] = $payload;
-        return checkout_test_session_factory::payment_session('cs_test_' . count($this->createdpayloads), 'open', 'unpaid');
-    }
-
-    /**
-     * @param string $sessionid
-     * @param array $params
-     * @return object
-     */
-    public function retrieve(string $sessionid, array $params = []): object {
-        $this->retrievecalls[] = [$sessionid, $params];
-        return $this->retrieved[$sessionid] ?? (object)[
-            'id' => $sessionid,
-            'mode' => 'payment',
-            'payment_status' => 'unpaid',
-            'payment_intent' => (object)['status' => 'requires_payment_method'],
-        ];
-    }
-}
-
-/**
- * Fake product pricing service.
- */
-final class checkout_test_fake_product_pricing_service extends product_pricing_service {
-    /** @var array */
-    public $lastargs = [];
-
-    public function __construct() {
-    }
-
-    /**
-     * @param object $config
-     * @param \core_payment\local\entities\payable $payable
-     * @param string $description
-     * @param float $cost
-     * @param string $component
-     * @param string $paymentarea
-     * @param string $itemid
-     * @param array|null $subscription
-     * @return array
-     */
-    public function create_product_and_price(
-        object $config,
-        \core_payment\local\entities\payable $payable,
-        string $description,
-        float $cost,
-        string $component,
-        string $paymentarea,
-        string $itemid,
-        ?array $subscription = null
-    ) {
-        $this->lastargs = func_get_args();
-        $product = Product::constructFrom(['id' => 'prod_test_1', 'name' => $description]);
-        $price = Price::constructFrom(['id' => 'price_test_1']);
-        return [$product, $price];
-    }
-}
-
-/**
- * Fake customer service.
- */
-final class checkout_test_fake_customer_service extends customer_service {
-    /** @var array */
-    public $createdusers = [];
-    /** @var array */
-    public $updatedcustomers = [];
-    /** @var Customer|null */
-    public $existingcustomer = null;
-
-    public function __construct() {
-    }
-
-    /**
-     * @param int $userid
-     * @return Customer|null
-     */
-    public function get_customer(int $userid): ?Customer {
-        return $this->existingcustomer;
-    }
-
-    /**
-     * @param object $user
-     * @return Customer
-     */
-    public function create_customer($user): Customer {
-        $this->createdusers[] = $user->id;
-        return Customer::constructFrom(['id' => 'cus_test_1']);
-    }
-
-    /**
-     * @param Customer $customer
-     * @param object $user
-     * @return Customer
-     */
-    public function update_customer_details(Customer $customer, $user) {
-        $this->updatedcustomers[] = $customer->id;
-        return Customer::constructFrom(['id' => $customer->id]);
-    }
-}
-
-/**
- * Fake webhook service.
- */
-final class checkout_test_fake_webhook_service extends webhook_service {
-    /** @var array */
-    public $createdfor = [];
-
-    public function __construct() {
-    }
-
-    /**
-     * @param int $paymentaccountid
-     * @return bool
-     */
-    public function create_webhook(int $paymentaccountid): bool {
-        $this->createdfor[] = $paymentaccountid;
-        return true;
-    }
-}
-
-/**
- * Fake subscription service recording delegated sessions.
- */
-final class checkout_test_fake_subscription_service extends subscription_service {
-    /** @var array */
-    public $savedsessions = [];
-
-    public function __construct() {
-    }
-
-    /**
-     * @param StripeSession $session
-     * @return void
-     */
-    public function save_subscription(StripeSession $session) {
-        $this->savedsessions[] = $session->id;
-    }
-}
-
-/**
- * Session factory for checkout tests.
- */
-final class checkout_test_session_factory {
-    /**
-     * Builds a payment mode session with line items and customer expanded.
-     *
-     * @param string $sessionid
-     * @param string $status
-     * @param string $paymentstatus
-     * @return StripeSession
-     */
-    public static function payment_session(string $sessionid, string $status, string $paymentstatus): StripeSession {
-        $session = StripeSession::constructFrom([
-            'id' => $sessionid,
-            'mode' => 'payment',
-            'payment_intent' => 'pi_save_1',
-            'amount_total' => 1050,
-            'payment_status' => $paymentstatus,
-            'status' => $status,
-        ]);
-        $session->customer = (object)['id' => 'cus_save_1'];
-        $session->line_items = new checkout_test_line_items('prod_save_1');
-        return $session;
-    }
-
-    /**
-     * Builds a subscription mode session.
-     *
-     * @param string $sessionid
-     * @return StripeSession
-     */
-    public static function subscription_session(string $sessionid): StripeSession {
-        return StripeSession::constructFrom([
-            'id' => $sessionid,
-            'mode' => 'subscription',
-            'subscription' => 'sub_test_1',
-        ]);
-    }
-}
-
-/**
- * Line item collection stub supporting first().
- */
-final class checkout_test_line_items {
-    /** @var object */
-    private $first;
-
-    public function __construct(string $productid) {
-        $this->first = (object)['price' => (object)['product' => $productid]];
-    }
-
-    /**
-     * @return object
-     */
-    public function first(): object {
-        return $this->first;
     }
 }

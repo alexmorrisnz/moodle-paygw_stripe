@@ -18,49 +18,46 @@ declare(strict_types=1);
 
 namespace paygw_stripe\local\service;
 
-use advanced_testcase;
+defined('MOODLE_INTERNAL') || die();
+
 use core_payment\local\entities\payable;
 use paygw_stripe\local\repository\invoice_repository;
 use paygw_stripe\stripe_helper;
-use paygw_stripe\tests\fixtures\invoice_http_client;
-use Stripe\ApiRequestor;
+use paygw_stripe\tests\fixtures\invoice_testcase;
 use Stripe\Event;
-use Stripe\StripeClient;
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
-require_once(__DIR__ . '/fixtures/invoice_http_client.php');
+require_once(__DIR__ . '/../../fixtures/invoice_testcase.php');
 
 /**
  * Integration tests using Moodle's real database, payment callback and lock factory.
  *
  * @package paygw_stripe
  * @category test
+ * @covers \paygw_stripe\local\service\invoice_service
+ * @covers \paygw_stripe\local\service\customer_service
+ * @covers \paygw_stripe\stripe_helper
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class invoice_flow_test extends advanced_testcase {
-    private invoice_http_client $http;
+final class invoice_flow_test extends invoice_testcase {
+    /** @var invoice_service Service under test. */
     private invoice_service $service;
+    /** @var invoice_repository Persisted invoice requests. */
     private invoice_repository $repository;
+    /** @var int Payment account ID. */
     private int $accountid;
+    /** @var int Fee enrolment instance ID. */
     private int $instanceid;
+    /** @var int Purchasing user ID. */
     private int $userid;
-    private $originalhttpclient;
 
+    /**
+     * Create a purchasing user, payment account and fee enrolment instance.
+     */
     protected function setUp(): void {
         global $DB;
         parent::setUp();
-        $this->resetAfterTest();
-        $property = new \ReflectionProperty(ApiRequestor::class, '_httpClient');
-        $property->setAccessible(true);
-        $this->originalhttpclient = $property->getValue();
-        $this->http = new invoice_http_client();
-        ApiRequestor::setHttpClient($this->http);
-        $this->service = new invoice_service(new StripeClient([
-            'api_key' => 'sk_test_fake',
-            'stripe_version' => stripe_helper::$apiversion,
-        ]));
+        $this->service = new invoice_service($this->client);
         $this->repository = new invoice_repository();
         $user = $this->getDataGenerator()->create_user(['email' => 'learner@example.test']);
         $this->setUser($user);
@@ -84,11 +81,14 @@ final class invoice_flow_test extends advanced_testcase {
         ]);
     }
 
-    protected function tearDown(): void {
-        ApiRequestor::setHttpClient($this->originalhttpclient);
-        parent::tearDown();
-    }
-
+    /**
+     * Start an invoice purchase and extract its continuation credentials.
+     *
+     * @param string $currency Payment currency
+     * @param string|null $country Bank transfer country
+     * @param bool $tax Whether to enable automatic tax
+     * @return array Invoice request ID and continuation token
+     */
     private function start(string $currency = 'EUR', ?string $country = null, bool $tax = false): array {
         $config = (object)['enableautomatictax' => $tax, 'defaulttaxbehavior' => 'exclusive'];
         if ($country !== null) {
@@ -109,6 +109,11 @@ final class invoice_flow_test extends advanced_testcase {
         return [(int)$query['request'], $query['token']];
     }
 
+    /**
+     * Populate the customer's billing details in the API fixture.
+     *
+     * @param int $id Invoice request ID
+     */
     private function billing_details(int $id): void {
         $customerid = $this->repository->find_by_id($id)->customerid;
         $this->http->customers[$customerid]['name'] = 'Example GmbH';
@@ -116,6 +121,13 @@ final class invoice_flow_test extends advanced_testcase {
         $this->http->customers[$customerid]['address'] = ['line1' => 'Billing Street', 'country' => 'DE'];
     }
 
+    /**
+     * Complete billing and assert the hosted invoice URL.
+     *
+     * @param int $id Invoice request ID
+     * @param string $token Continuation token
+     * @return string Stripe invoice ID
+     */
     private function complete(int $id, string $token): string {
         $this->billing_details($id);
         $url = $this->service->complete_billing($id, $this->userid, $token);
@@ -124,11 +136,24 @@ final class invoice_flow_test extends advanced_testcase {
         return $invoiceid;
     }
 
+    /**
+     * Construct a webhook event from a fixture invoice.
+     *
+     * @param string $invoiceid Stripe invoice ID
+     * @param string $type Event type
+     * @return Event Stripe webhook event
+     */
     private function event(string $invoiceid, string $type = 'invoice.paid'): Event {
         return Event::constructFrom(['id' => 'evt_test', 'object' => 'event', 'type' => $type,
             'data' => ['object' => $this->http->invoices[$invoiceid] ?? ['id' => $invoiceid, 'object' => 'invoice']]]);
     }
 
+    /**
+     * Assert that a callback throws the expected Moodle error.
+     *
+     * @param string $code Expected error code
+     * @param callable $callback Operation to execute
+     */
     private function assert_error(string $code, callable $callback): void {
         try {
             $callback();
@@ -315,7 +340,10 @@ final class invoice_flow_test extends advanced_testcase {
         $this->assertSame('FR', $this->repository->find_by_id($id)->banktransfercountry);
         $settings = $this->http->invoices[$invoiceid]['payment_settings'];
         $this->assertSame(['paypal', 'klarna', 'customer_balance'], $settings['payment_method_types']);
-        $this->assertSame('FR', $settings['payment_method_options']['customer_balance']['bank_transfer']['eu_bank_transfer']['country']);
+        $this->assertSame(
+            'FR',
+            $settings['payment_method_options']['customer_balance']['bank_transfer']['eu_bank_transfer']['country']
+        );
         $creates = array_values(array_filter(
             $this->http->requests,
             static fn($request) => $request['path'] === '/v1/invoices' && $request['method'] === 'post'
@@ -444,15 +472,15 @@ final class invoice_flow_test extends advanced_testcase {
         [$id] = $this->start();
         $this->billing_details($id);
         $record = $this->repository->find_by_id($id);
-        $customer = (new customer_service(new StripeClient(['api_key' => 'sk_test_fake'])))->get_customer($this->userid);
+        $customer = (new customer_service($this->client))->get_customer($this->userid);
         $this->assertSame('Example GmbH', $customer->name);
-        (new customer_service(new StripeClient(['api_key' => 'sk_test_fake'])))
+        (new customer_service($this->client))
             ->update_customer_details($customer, $USER);
         $this->assertSame('Example GmbH', $this->http->customers[$record->customerid]['name']);
         $this->assertSame('billing@example.test', $this->http->customers[$record->customerid]['email']);
         $this->http->customererror = true;
         try {
-            (new customer_service(new StripeClient(['api_key' => 'sk_test_fake'])))->get_customer($this->userid);
+            (new customer_service($this->client))->get_customer($this->userid);
             $this->fail('Expected customer outage');
         } catch (\Stripe\Exception\ApiConnectionException $e) {
             $this->assertSame(1, $DB->count_records('paygw_stripe_customers'));

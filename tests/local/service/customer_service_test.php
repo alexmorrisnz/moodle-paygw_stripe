@@ -27,22 +27,20 @@ declare(strict_types=1);
 
 namespace paygw_stripe\local\service;
 
-use advanced_testcase;
-use Stripe\Customer;
-use Stripe\StripeClient;
+defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.php');
+use paygw_stripe\tests\fixtures\stripe_testcase;
+use Stripe\Exception\InvalidRequestException;
+use Stripe\Service\CustomerService;
+
+require_once(__DIR__ . '/../../fixtures/stripe_testcase.php');
 
 /**
  * Tests for customer_service.
+ *
+ * @covers \paygw_stripe\local\service\customer_service
  */
-final class customer_service_test extends advanced_testcase {
-    protected function setUp(): void {
-        parent::setUp();
-        $this->resetAfterTest();
-    }
-
+final class customer_service_test extends stripe_testcase {
     /**
      * Tests get_customer deletes stale DB record if Stripe retrieval fails.
      */
@@ -55,44 +53,13 @@ final class customer_service_test extends advanced_testcase {
             'customerid' => 'cus_missing',
         ]);
 
-        $stripeclient = new customer_test_fake_client();
-        $stripeclient->customers->throwonretrieveids[] = 'cus_missing';
-        $service = new customer_service($stripeclient);
+        $customers = $this->mock_stripe_service('customers', CustomerService::class);
+        $customers->expects($this->once())->method('retrieve')->with('cus_missing')->willThrowException(
+            InvalidRequestException::factory('Missing customer', 404, null, null, null, 'resource_missing')
+        );
+        $service = new customer_service($this->client);
 
         $this->assertNull($service->get_customer((int)$user->id));
         $this->assertFalse($DB->record_exists('paygw_stripe_customers', ['userid' => $user->id]));
-    }
-}
-
-/**
- * Minimal fake Stripe client for unit testing customer_service without network calls.
- */
-final class customer_test_fake_client extends StripeClient {
-    /** @var customer_test_fake_customers_service */
-    public $customers;
-
-    public function __construct() {
-        $this->customers = new customer_test_fake_customers_service();
-    }
-}
-
-/**
- * Fake customers service.
- */
-final class customer_test_fake_customers_service {
-    /** @var array */
-    public $throwonretrieveids = [];
-    /** @var array */
-    private $customers = [];
-
-    /**
-     * @param string $id
-     * @return Customer
-     */
-    public function retrieve(string $id): Customer {
-        if (in_array($id, $this->throwonretrieveids, true)) {
-            throw \Stripe\Exception\InvalidRequestException::factory('Missing customer', 404, null, null, null, 'resource_missing');
-        }
-        return $this->customers[$id] ?? Customer::constructFrom(['id' => $id]);
     }
 }
