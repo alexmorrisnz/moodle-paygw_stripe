@@ -23,6 +23,7 @@ use core_payment\local\entities\payable;
 use paygw_stripe\gateway;
 use paygw_stripe\local\model\invoice;
 use paygw_stripe\local\repository\invoice_repository;
+use paygw_stripe\local\repository\customer_repository;
 use Stripe\Event;
 use Stripe\Invoice as stripe_invoice;
 use Stripe\StripeClient;
@@ -166,6 +167,9 @@ class invoice_service {
                 $record->timemodified = time();
                 $this->repository->save($record);
             }
+            if ($record->status === 'cancelled') {
+                (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+            }
         } finally {
             $lock->release();
         }
@@ -195,6 +199,7 @@ class invoice_service {
                 if ($record->timeexpires < time()) {
                     $record->status = 'expired';
                     $this->repository->save($record);
+                    (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
                     throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
                 }
 
@@ -359,6 +364,11 @@ class invoice_service {
         $record->status = $stripeinvoice->status;
         $record->timemodified = time();
         $this->repository->save($record);
+
+        if (in_array($stripeinvoice->status, ['open', 'paid'], true)) {
+            // Finalization snapshots the invoice's billing identity before profile sync resumes.
+            (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+        }
 
         return $stripeinvoice;
     }

@@ -75,4 +75,17 @@ final class customer_repository extends base_repository {
     public function delete_by_userid(int $userid): void {
         $this->db->delete_records($this->table(), ['userid' => $userid]);
     }
+
+    /**
+     * Resume profile synchronization for the customer used by a completed billing flow.
+     *
+     * @param int $userid Moodle user ID
+     * @param string $customerid Stripe customer ID
+     */
+    public function release_billing_identity(int $userid, string $customerid): void {
+        $this->db->set_field($this->table(), 'billingmanaged', 0, [
+            'userid' => $userid,
+            'customerid' => $customerid,
+        ]);
+    }
 }

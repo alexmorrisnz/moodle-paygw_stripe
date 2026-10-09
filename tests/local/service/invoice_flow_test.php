@@ -260,10 +260,72 @@ final class invoice_flow_test extends invoice_testcase {
             } catch (\Stripe\Exception\ApiConnectionException $e) {
                 $this->assertStringContainsString('response loss', $e->getMessage());
             }
+            $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
             $this->complete($id, $token);
+            $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
             $this->assertSame(0, $DB->count_records('payments'));
             $this->assertCount(count($this->http->invoices), $this->http->sent);
         }
+    }
+
+    public function test_failed_finalization_keeps_billing_identity_protected(): void {
+        global $DB, $USER;
+
+        [$id, $token] = $this->start();
+        $this->billing_details($id);
+        $this->http->failbefore = '/v1/invoices/in_1/finalize';
+        try {
+            $this->service->complete_billing($id, $this->userid, $token);
+            $this->fail('Expected finalization failure');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertSame('draft', $this->http->invoices['in_1']['status']);
+        }
+        $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+        $customers = new customer_service($this->client);
+        $customers->update_customer_details($customers->get_customer($this->userid), $USER);
+        $customerid = $this->repository->find_by_id($id)->customerid;
+        $this->assertSame('billing@example.test', $this->http->customers[$customerid]['email']);
+
+        $this->service->complete_billing($id, $this->userid, $token);
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+    }
+
+    public function test_finalized_invoice_releases_identity_before_email_retry(): void {
+        global $DB, $USER;
+
+        [$id, $token] = $this->start();
+        $this->billing_details($id);
+        $this->http->failbefore = '/v1/invoices/in_1/send';
+        $this->assert_error('invoiceemailfailed', fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+        $this->assertSame('open', $this->http->invoices['in_1']['status']);
+
+        $customers = new customer_service($this->client);
+        $customers->update_customer_details($customers->get_customer($this->userid), $USER);
+        $customerid = $this->repository->find_by_id($id)->customerid;
+        $this->assertSame(fullname($USER), $this->http->customers[$customerid]['name']);
+        $this->assertSame($USER->email, $this->http->customers[$customerid]['email']);
+        $this->assertSame('billing@example.test', $this->http->invoices['in_1']['customer_email']);
+
+        $this->service->complete_billing($id, $this->userid, $token);
+        $this->assertSame('billing@example.test', $this->http->sent[0]['email']);
+    }
+
+    public function test_cancelled_and_expired_billing_release_identity(): void {
+        global $DB;
+
+        [$id] = $this->start();
+        $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+        $this->service->cancel_billing($id, $this->userid);
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+
+        [$id, $token] = $this->start();
+        $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+        $record = $this->repository->find_by_id($id);
+        $record->timeexpires = time() - 1;
+        $this->repository->save($record);
+        $this->assert_error('invalidinvoicecontinuation', fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
     }
 
     public function test_invoice_signed_webhook_paid_void_duplicate_and_rollback(): void {
@@ -519,6 +581,7 @@ final class invoice_flow_test extends invoice_testcase {
         [$id, $token] = $this->start('JPY');
         $invoiceid = $this->complete($id, $token);
         $this->assertSame('paid', $this->http->invoices[$invoiceid]['status']);
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
         $this->assertCount(1, $this->http->sent);
         $this->assertSame(0, $DB->count_records('payments'));
         $this->assertTrue($this->service->process_event($this->event($invoiceid)));
