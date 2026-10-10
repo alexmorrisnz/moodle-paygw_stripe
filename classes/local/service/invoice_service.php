@@ -188,16 +188,18 @@ class invoice_service {
         int $amount,
         string $currency
     ): ?string {
-        while ($record = $this->repository->find_active_purchase(
-            $userid,
-            $paymentaccountid,
-            $component,
-            $paymentarea,
-            $itemid,
-            $amount,
-            $currency,
-            time()
-        )) {
+        while (
+            $record = $this->repository->find_active_purchase(
+                $userid,
+                $paymentaccountid,
+                $component,
+                $paymentarea,
+                $itemid,
+                $amount,
+                $currency,
+                time()
+            )
+        ) {
             $lock = $this->lock($record->id);
             try {
                 $record = $this->repository->find_by_id($record->id);
