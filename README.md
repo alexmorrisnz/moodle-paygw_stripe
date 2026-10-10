@@ -13,7 +13,7 @@ Provides a payment gateway with Stripe in Moodle
 
 ## Invoice payment
 
-Version 2026092502 retains the payment methods Stripe resolves for each new EUR invoice and adds EU bank transfer before emailing it, with a configurable bank country (default DE). It provides a separate Customer Portal → standalone Stripe Invoice → Hosted Invoice Page flow and explicitly emails each new invoice through Stripe after finalization. Access is granted only by the verified `invoice.paid` webhook. See [setup, design, recovery and acceptance tests](docs/INVOICE_PAYMENT.md) (German). The existing Checkout and subscription flows remain available.
+Select **Invoice payment** in the Stripe payment account to let customers provide their billing details in Stripe's Customer Portal and receive a Stripe invoice by email. Customers pay through Stripe's hosted invoice page; Moodle grants access only after Stripe confirms payment. For EUR invoices, the plugin keeps the payment methods Stripe makes available and also offers EU bank transfer. The bank country is configurable (default: Germany). Existing Checkout and subscription payment flows remain available.
 
 ## Details
 
