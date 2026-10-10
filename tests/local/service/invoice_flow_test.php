@@ -71,8 +71,18 @@ final class invoice_flow_test extends invoice_testcase {
             json_encode(['apikey' => 'pk_test_fake', 'secretkey' => 'sk_test_fake']),
             ['accountid' => $this->accountid, 'gateway' => 'stripe']
         );
+        $this->instanceid = $this->create_fee_instance();
+    }
+
+    /**
+     * Create a distinct fee purchase target using the same payment account.
+     *
+     * @return int Fee enrolment instance ID
+     */
+    private function create_fee_instance(): int {
+        global $DB;
         $course = $this->getDataGenerator()->create_course();
-        $this->instanceid = (int)enrol_get_plugin('fee')->add_instance($course, [
+        return (int)enrol_get_plugin('fee')->add_instance($course, [
             'courseid' => $course->id,
             'customint1' => $this->accountid,
             'cost' => 49.95,
@@ -87,26 +97,50 @@ final class invoice_flow_test extends invoice_testcase {
      * @param string $currency Payment currency
      * @param string|null $country Bank transfer country
      * @param bool $tax Whether to enable automatic tax
+     * @param int|null $itemid Purchase item ID
      * @return array Invoice request ID and continuation token
      */
-    private function start(string $currency = 'EUR', ?string $country = null, bool $tax = false): array {
+    private function start(
+        string $currency = 'EUR',
+        ?string $country = null,
+        bool $tax = false,
+        ?int $itemid = null
+    ): array {
+        $url = $this->start_url($currency, $country, $tax, $itemid);
+        $this->assertStringStartsWith('https://billing.stripe.com/', $url);
+        $session = end($this->http->sessions);
+        parse_str(parse_url($session['flow_data']['after_completion']['redirect']['return_url'], PHP_URL_QUERY), $query);
+        return [(int)$query['request'], $query['token']];
+    }
+
+    /**
+     * Start or resume a purchase and return its redirect URL.
+     *
+     * @param string $currency
+     * @param string|null $country
+     * @param bool $tax
+     * @param int|null $itemid
+     * @return string
+     */
+    private function start_url(
+        string $currency = 'EUR',
+        ?string $country = null,
+        bool $tax = false,
+        ?int $itemid = null
+    ): string {
         $config = (object)['enableautomatictax' => $tax, 'defaulttaxbehavior' => 'exclusive'];
         if ($country !== null) {
             $config->invoicebankcountry = $country;
         }
-        $url = $this->service->start_payment(
+        return $this->service->start_payment(
             $config,
             new payable(49.95, $currency, $this->accountid),
             'Course fee',
             49.95,
             'enrol_fee',
             'fee',
-            $this->instanceid
+            $itemid ?? $this->instanceid
         );
-        $this->assertStringStartsWith('https://billing.stripe.com/', $url);
-        $session = end($this->http->sessions);
-        parse_str(parse_url($session['flow_data']['after_completion']['redirect']['return_url'], PHP_URL_QUERY), $query);
-        return [(int)$query['request'], $query['token']];
     }
 
     /**
@@ -119,6 +153,92 @@ final class invoice_flow_test extends invoice_testcase {
         $this->http->customers[$customerid]['name'] = 'Example GmbH';
         $this->http->customers[$customerid]['email'] = 'billing@example.test';
         $this->http->customers[$customerid]['address'] = ['line1' => 'Billing Street', 'country' => 'DE'];
+    }
+
+    public function test_returning_purchase_reopens_invoice_but_unfinished_billing_is_rejected(): void {
+        global $DB;
+        [$id, $token] = $this->start();
+        $sessioncount = count($this->http->sessions);
+
+        $this->assert_error('invoicealreadyactive', fn() => $this->start_url());
+        $this->assertSame($sessioncount, count($this->http->sessions));
+        $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+
+        $invoiceid = $this->complete($id, $token);
+        $this->assertSame('open', $this->http->invoices[$invoiceid]['status']);
+        $record = $this->repository->find_by_id($id);
+        $record->timeexpires = time() - DAYSECS;
+        $this->repository->save($record);
+        $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url());
+        $this->assertSame($sessioncount, count($this->http->sessions));
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertCount(1, $this->http->sent);
+
+        [$other] = $this->start(itemid: $this->create_fee_instance());
+        $this->assertNotSame($id, $other);
+        $this->assertSame(2, $DB->count_records('paygw_stripe_invoices'));
+    }
+
+    public function test_returning_purchase_checks_stripe_status_and_waits_for_paid_webhook(): void {
+        global $DB;
+        [$id, $token] = $this->start();
+        $invoiceid = $this->complete($id, $token);
+        $this->http->paid($invoiceid);
+
+        $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url());
+        $this->assertSame('paid', $this->repository->find_by_id($id)->status);
+        $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url());
+        $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+        $this->assertSame(0, $DB->count_records('payments'));
+        $this->assertFalse($this->repository->find_by_id($id)->delivered);
+        $this->assertTrue($this->service->process_event($this->event($invoiceid)));
+    }
+
+    public function test_returning_purchase_can_replace_a_void_invoice(): void {
+        [$id, $token] = $this->start();
+        $invoiceid = $this->complete($id, $token);
+        $this->http->invoices[$invoiceid]['status'] = 'void';
+        [$other] = $this->start();
+        $this->assertNotSame($id, $other);
+        $this->assertSame('void', $this->repository->find_by_id($id)->status);
+    }
+
+    public function test_returning_purchase_rejects_a_foreign_invoice(): void {
+        [$id, $token] = $this->start();
+        $invoiceid = $this->complete($id, $token);
+        $this->http->invoices[$invoiceid]['metadata']['userid'] = '999';
+        $this->assert_error('invalidinvoicebinding', fn() => $this->start_url());
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertCount(1, $this->http->sessions);
+    }
+
+    public function test_returning_purchase_does_not_create_a_duplicate_when_stripe_is_unavailable(): void {
+        global $DB;
+        [$id, $token] = $this->start();
+        $invoiceid = $this->complete($id, $token);
+        $this->http->failbefore = '/v1/invoices/' . $invoiceid;
+        try {
+            $this->start_url();
+            $this->fail('Expected invoice retrieval failure');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+            $this->assertCount(1, $this->http->sessions);
+            $this->assertCount(1, $this->http->invoices);
+        }
+        $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url());
+    }
+
+    public function test_returning_purchase_finishes_preparing_the_same_invoice_after_email_failure(): void {
+        [$id, $token] = $this->start();
+        $this->billing_details($id);
+        $this->http->failbefore = '/v1/invoices/in_1/send';
+        $this->assert_error('invoiceemailfailed', fn() => $this->service->complete_billing($id, $this->userid, $token));
+
+        $this->assertSame('https://invoice.stripe.com/in_1', $this->start_url());
+        $this->assertSame('sent', $this->repository->find_by_id($id)->emailstatus);
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertCount(1, $this->http->sent);
+        $this->assertCount(1, $this->http->sessions);
     }
 
     /**
@@ -165,7 +285,7 @@ final class invoice_flow_test extends invoice_testcase {
 
     public function test_invoice_continuation_authorization_expiry_and_cancel(): void {
         global $DB;
-        [$id, $token] = $this->start();
+        [$id, $token] = $this->start(itemid: $this->create_fee_instance());
         $session = end($this->http->sessions);
         $this->assertStringNotContainsString($token, $session['return_url']);
         $this->assertSame('customer_update', $session['flow_data']['type']);
@@ -189,7 +309,7 @@ final class invoice_flow_test extends invoice_testcase {
             'invoicebillingincomplete',
             fn() => $this->service->complete_billing($id, $this->userid, $token)
         );
-        [$other, $othertoken] = $this->start();
+        [$other, $othertoken] = $this->start(itemid: $this->create_fee_instance());
         $this->assert_error(
             'invalidinvoicecontinuation',
             fn() => $this->service->complete_billing($other, $this->userid, $token)
@@ -245,7 +365,7 @@ final class invoice_flow_test extends invoice_testcase {
     public function test_invoice_lost_responses_reuse_remote_writes(): void {
         global $DB;
         foreach (['create', 'item', 'finalize'] as $failure) {
-            [$id, $token] = $this->start();
+            [$id, $token] = $this->start(itemid: $this->create_fee_instance());
             $this->billing_details($id);
             $nextid = 'in_' . (count($this->http->invoices) + 1);
             $path = match ($failure) {
@@ -360,7 +480,7 @@ final class invoice_flow_test extends invoice_testcase {
         $this->assertTrue($this->repository->find_by_id($id)->delivered);
         $this->assertSame(1, $DB->count_records('user_enrolments', ['userid' => $this->userid]));
 
-        [$other, $othertoken] = $this->start();
+        [$other, $othertoken] = $this->start(itemid: $this->create_fee_instance());
         $voidid = $this->complete($other, $othertoken);
         $this->http->invoices[$voidid]['status'] = 'void';
         $this->assertTrue($this->service->process_event($this->event($voidid, 'invoice.voided')));
@@ -441,7 +561,7 @@ final class invoice_flow_test extends invoice_testcase {
         ));
         $this->assertSame($sends[0]['key'], $sends[1]['key']);
 
-        [$other, $othertoken] = $this->start();
+        [$other, $othertoken] = $this->start(itemid: $this->create_fee_instance());
         $this->billing_details($other);
         $this->http->lose = '/v1/invoices/in_2/send';
         $this->assert_error(
@@ -549,11 +669,11 @@ final class invoice_flow_test extends invoice_testcase {
         }
         $this->http->customererror = false;
         $this->http->configs['bpc_1']['features']['payment_method_update']['enabled'] = true;
-        $this->start();
+        $this->start(itemid: $this->create_fee_instance());
         $this->assertCount(1, $this->http->configs);
         $this->assertFalse($this->http->configs['bpc_1']['features']['payment_method_update']['enabled']);
         $this->http->configs['bpc_1']['is_default'] = true;
-        $this->start();
+        $this->start(itemid: $this->create_fee_instance());
         $this->assertCount(2, $this->http->configs);
         $this->assertSame('bpc_2', end($this->http->sessions)['configuration']);
     }

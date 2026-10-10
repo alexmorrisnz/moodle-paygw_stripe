@@ -60,7 +60,7 @@ class invoice_service {
     }
 
     /**
-     * Save a pending purchase and redirect to billing collection. No invoice exists yet.
+     * Reopen a matching invoice, or save a new purchase and collect billing details.
      *
      * @param object $config
      * @param payable $payable
@@ -69,7 +69,7 @@ class invoice_service {
      * @param string $component
      * @param string $paymentarea
      * @param int $itemid
-     * @return string Portal URL
+     * @return string Portal URL or Hosted Invoice Page
      */
     public function start_payment(
         object $config,
@@ -89,6 +89,23 @@ class invoice_service {
             }
         }
 
+        $amount = (int) round($this->pricing->get_unit_amount($cost, $payable->get_currency()));
+        $currency = strtolower($payable->get_currency());
+        $userid = (int) $USER->id;
+        $paymentaccountid = $payable->get_account_id();
+        $existingurl = $this->existing_invoice_url(
+            $userid,
+            $paymentaccountid,
+            $component,
+            $paymentarea,
+            $itemid,
+            $amount,
+            $currency
+        );
+        if ($existingurl !== null) {
+            return $existingurl;
+        }
+
         (new webhook_service($this->stripe))->ensure_invoice_events($payable->get_account_id());
 
         $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
@@ -97,14 +114,14 @@ class invoice_service {
 
         $record = new invoice(
             id: null,
-            userid: (int) $USER->id,
-            paymentaccountid: $payable->get_account_id(),
+            userid: $userid,
+            paymentaccountid: $paymentaccountid,
             customerid: $customer->id,
             component: $component,
             paymentarea: $paymentarea,
             itemid: $itemid,
-            amount: (int) round($this->pricing->get_unit_amount($cost, $payable->get_currency())),
-            currency: strtolower($payable->get_currency()),
+            amount: $amount,
+            currency: $currency,
             description: $description,
             automatictax: !empty($config->enableautomatictax),
             taxbehavior: $config->defaulttaxbehavior ?? 'inclusive',
@@ -115,7 +132,24 @@ class invoice_service {
             banktransfercountry: $bankcountry,
             paymentmethodstatus: $bankcountry === null ? 'legacy' : 'pending',
         );
-        $record = $this->repository->save($record);
+        $lock = $this->purchase_lock($userid, $paymentaccountid, $component, $paymentarea, $itemid);
+        try {
+            $existingurl = $this->existing_invoice_url(
+                $userid,
+                $paymentaccountid,
+                $component,
+                $paymentarea,
+                $itemid,
+                $amount,
+                $currency
+            );
+            if ($existingurl !== null) {
+                return $existingurl;
+            }
+            $record = $this->repository->save($record);
+        } finally {
+            $lock->release();
+        }
 
         $success = new \moodle_url('/payment/gateway/stripe/invoice.php', ['request' => $record->id, 'token' => $token]);
         $return = new \moodle_url('/payment/gateway/stripe/invoice_return.php', [
@@ -131,6 +165,119 @@ class invoice_service {
         $record->portalsessionid = $portal->id;
         $this->repository->save($record);
         return $portal->url;
+    }
+
+    /**
+     * Reopen a bound Stripe invoice, without duplicating unfinished billing flows.
+     *
+     * @param int $userid
+     * @param int $paymentaccountid
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @param int $amount
+     * @param string $currency
+     * @return string|null Hosted Invoice Page, or null when a new purchase is allowed
+     */
+    private function existing_invoice_url(
+        int $userid,
+        int $paymentaccountid,
+        string $component,
+        string $paymentarea,
+        int $itemid,
+        int $amount,
+        string $currency
+    ): ?string {
+        while ($record = $this->repository->find_active_purchase(
+            $userid,
+            $paymentaccountid,
+            $component,
+            $paymentarea,
+            $itemid,
+            $amount,
+            $currency,
+            time()
+        )) {
+            $lock = $this->lock($record->id);
+            try {
+                $record = $this->repository->find_by_id($record->id);
+                if (in_array($record->status, ['cancelled', 'void', 'uncollectible', 'expired'], true) || $record->delivered) {
+                    continue;
+                }
+                if ($record->status === 'billing') {
+                    if ($record->timeexpires < time()) {
+                        continue;
+                    }
+                    throw new \moodle_exception('invoicealreadyactive', 'paygw_stripe');
+                }
+                if (!$record->invoiceid) {
+                    throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+                }
+
+                $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
+                if (
+                    !$this->is_bound($record, $stripeinvoice) ||
+                    ($record->amounttotal !== null && $record->amounttotal !== (int) $stripeinvoice->total)
+                ) {
+                    throw new \moodle_exception('invalidinvoicebinding', 'paygw_stripe');
+                }
+
+                if (in_array($stripeinvoice->status, ['void', 'uncollectible'], true)) {
+                    $record->status = $stripeinvoice->status;
+                    $record->timemodified = time();
+                    $this->repository->save($record);
+                    continue;
+                }
+                if (!in_array($stripeinvoice->status, ['open', 'paid'], true) || !$stripeinvoice->hosted_invoice_url) {
+                    throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
+                }
+
+                // Paid invoices awaiting their webhook must not trigger another purchase.
+                $record->status = $stripeinvoice->status;
+                $record->amounttotal = (int) $stripeinvoice->total;
+                $record->timemodified = time();
+                $this->repository->save($record);
+                (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+                $stripeinvoice = $this->configure_invoice_payment_methods($record, $stripeinvoice);
+                $this->send_invoice_email($record, $stripeinvoice);
+                return $stripeinvoice->hosted_invoice_url;
+            } finally {
+                $lock->release();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Serialize creation of requests for the same purchase.
+     *
+     * @param int $userid
+     * @param int $paymentaccountid
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @return \core\lock\lock
+     */
+    private function purchase_lock(
+        int $userid,
+        int $paymentaccountid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): \core\lock\lock {
+        $key = hash('sha256', implode("\0", [
+            $userid,
+            $paymentaccountid,
+            $component,
+            $paymentarea,
+            $itemid,
+        ]));
+        $factory = \core\lock\lock_config::get_lock_factory('paygw_stripe');
+        $lock = $factory->get_lock('invoice_purchase_' . $key, 10);
+        if (!$lock) {
+            throw new \moodle_exception('invoicebusy', 'paygw_stripe');
+        }
+        return $lock;
     }
 
     /**

@@ -52,4 +52,52 @@ final class invoice_repository extends base_repository {
         $record = $this->db->get_record($this->table(), ['invoiceid' => $invoiceid]);
         return $record ? $this->hydrate($record) : null;
     }
+
+    /**
+     * Find an active request or undelivered invoice for the same purchase and amount.
+     * @param int $userid
+     * @param int $paymentaccountid
+     * @param string $component
+     * @param string $paymentarea
+     * @param int $itemid
+     * @param int $amount
+     * @param string $currency
+     * @param int $now
+     * @return invoice|null
+     */
+    public function find_active_purchase(
+        int $userid,
+        int $paymentaccountid,
+        string $component,
+        string $paymentarea,
+        int $itemid,
+        int $amount,
+        string $currency,
+        int $now
+    ): ?invoice {
+        $select = 'userid = :userid AND paymentaccountid = :paymentaccountid AND component = :component ' .
+            'AND paymentarea = :paymentarea AND itemid = :itemid AND amount = :amount AND currency = :currency ' .
+            'AND (status = :open OR status = :creating OR (status = :paid AND delivered = 0) ' .
+            'OR (status = :billing AND timeexpires >= :now))';
+        $params = [
+            'userid' => $userid,
+            'paymentaccountid' => $paymentaccountid,
+            'component' => $component,
+            'paymentarea' => $paymentarea,
+            'itemid' => $itemid,
+            'amount' => $amount,
+            'currency' => $currency,
+            'open' => 'open',
+            'creating' => 'creating',
+            'paid' => 'paid',
+            'billing' => 'billing',
+            'now' => $now,
+        ];
+        $records = $this->db->get_records_select($this->table(), $select, $params, 'id DESC', '*', 0, 1);
+        if (!$records) {
+            return null;
+        }
+        $record = reset($records);
+        return $record ? $this->hydrate($record) : null;
+    }
 }
