@@ -38,6 +38,7 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
             [
                 'userid' => 'privacy:metadata:stripe_customers:userid',
                 'customerid' => 'privacy:metadata:stripe_customers:customerid',
+                'billingmanaged' => 'privacy:metadata:stripe_customers:billingmanaged',
             ],
             'privacy:metadata:stripe_customers'
         );
@@ -56,6 +57,25 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
                 'userid' => 'privacy:metadata:stripe_subscriptions:userid',
             ],
             'privacy:metadata:stripe_subscriptions'
+        );
+
+        $collection->add_database_table(
+            'paygw_stripe_invoices',
+            [
+                'userid' => 'privacy:metadata:stripe_invoices:userid',
+                'customerid' => 'privacy:metadata:stripe_invoices:customerid',
+                'invoiceid' => 'privacy:metadata:stripe_invoices:invoiceid',
+                'amounttotal' => 'privacy:metadata:stripe_invoices:amounttotal',
+                'status' => 'privacy:metadata:stripe_invoices:status',
+                'delivered' => 'privacy:metadata:stripe_invoices:delivered',
+                'emailstatus' => 'privacy:metadata:stripe_invoices:emailstatus',
+                'timeemailstarted' => 'privacy:metadata:stripe_invoices:timeemailstarted',
+                'timeemailsent' => 'privacy:metadata:stripe_invoices:timeemailsent',
+                'banktransfercountry' => 'privacy:metadata:stripe_invoices:banktransfercountry',
+                'paymentmethodstatus' => 'privacy:metadata:stripe_invoices:paymentmethodstatus',
+                'paymentmethods' => 'privacy:metadata:stripe_invoices:paymentmethods',
+            ],
+            'privacy:metadata:stripe_invoices'
         );
 
         return $collection;

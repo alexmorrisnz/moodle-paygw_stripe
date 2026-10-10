@@ -109,6 +109,22 @@ final class stripe_service_factory {
     }
 
     /**
+     * Create the standalone invoice service.
+     * @return invoice_service
+     */
+    public function invoice_service(): invoice_service {
+        return new invoice_service($this->stripe_client());
+    }
+
+    /**
+     * Create the restricted billing-details Portal service.
+     * @return customer_portal_service
+     */
+    public function customer_portal_service(): customer_portal_service {
+        return new customer_portal_service($this->stripe_client());
+    }
+
+    /**
      * Create a new payment method config service.
      *
      * @return payment_method_config_service

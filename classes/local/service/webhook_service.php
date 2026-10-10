@@ -99,6 +99,8 @@ class webhook_service {
                 'checkout.session.async_payment_failed',
                 'customer.subscription.deleted',
                 'customer.subscription.updated',
+                'invoice.paid',
+                'invoice.voided',
             ],
             'api_version' => stripe_helper::$apiversion,
         ]);
@@ -112,6 +114,26 @@ class webhook_service {
         $this->webhookrepository->save($record);
 
         return true;
+    }
+
+    /**
+     * Add invoice events to existing endpoints without removing any subscriptions
+     * or changing their API version/signing secret. Repair failed upgrade calls.
+     * @param int $paymentaccountid
+     */
+    public function ensure_invoice_events(int $paymentaccountid): void {
+        $this->create_webhook($paymentaccountid);
+        $webhook = $this->get_webhook($paymentaccountid);
+        $events = $webhook->enabled_events;
+        if (in_array('*', $events, true)) {
+            return;
+        }
+        $required = ['invoice.paid', 'invoice.voided'];
+        if (array_diff($required, $events)) {
+            $this->stripe->webhookEndpoints->update($webhook->id, [
+                'enabled_events' => array_values(array_unique(array_merge($events, $required))),
+            ]);
+        }
     }
 
     /**
