@@ -77,13 +77,41 @@ final class customer_repository extends base_repository {
     }
 
     /**
-     * Resume profile synchronization for the customer used by a completed billing flow.
+     * Release profile protection only when no active billing or invoice-creation request uses it.
+     *
+     * @param int $userid Moodle user ID
+     * @param string $customerid Stripe customer ID
+     * @param int $now Current timestamp
+     */
+    public function release_billing_identity_if_unused(int $userid, string $customerid, int $now): void {
+        $this->db->set_field_select(
+            $this->table(),
+            'billingmanaged',
+            0,
+            'userid = :userid AND customerid = :customerid AND NOT EXISTS (' .
+                'SELECT 1 FROM {paygw_stripe_invoices} invoices ' .
+                'WHERE invoices.userid = :invoiceuserid AND invoices.customerid = :invoicecustomerid ' .
+                'AND (invoices.status = :creating OR (invoices.status = :billing AND invoices.timeexpires >= :now)))',
+            [
+                'userid' => $userid,
+                'customerid' => $customerid,
+                'invoiceuserid' => $userid,
+                'invoicecustomerid' => $customerid,
+                'creating' => 'creating',
+                'billing' => 'billing',
+                'now' => $now,
+            ]
+        );
+    }
+
+    /**
+     * Ensure profile protection remains enabled for a saved billing purchase.
      *
      * @param int $userid Moodle user ID
      * @param string $customerid Stripe customer ID
      */
-    public function release_billing_identity(int $userid, string $customerid): void {
-        $this->db->set_field($this->table(), 'billingmanaged', 0, [
+    public function reserve_billing_identity(int $userid, string $customerid): void {
+        $this->db->set_field($this->table(), 'billingmanaged', 1, [
             'userid' => $userid,
             'customerid' => $customerid,
         ]);

@@ -108,8 +108,7 @@ final class invoice_flow_test extends invoice_testcase {
     ): array {
         $url = $this->start_url($currency, $country, $tax, $itemid);
         $this->assertStringStartsWith('https://billing.stripe.com/', $url);
-        $session = end($this->http->sessions);
-        parse_str(parse_url($session['flow_data']['after_completion']['redirect']['return_url'], PHP_URL_QUERY), $query);
+        $query = $this->last_portal_query();
         return [(int)$query['request'], $query['token']];
     }
 
@@ -144,6 +143,26 @@ final class invoice_flow_test extends invoice_testcase {
     }
 
     /**
+     * Return the continuation token embedded in the most recently created Portal session.
+     *
+     * @return string
+     */
+    private function last_portal_token(): string {
+        return $this->last_portal_query()['token'];
+    }
+
+    /**
+     * Return the query parameters embedded in the most recently created Portal session.
+     *
+     * @return array
+     */
+    private function last_portal_query(): array {
+        $session = end($this->http->sessions);
+        parse_str(parse_url($session['flow_data']['after_completion']['redirect']['return_url'], PHP_URL_QUERY), $query);
+        return $query;
+    }
+
+    /**
      * Populate the customer's billing details in the API fixture.
      *
      * @param int $id Invoice request ID
@@ -155,28 +174,148 @@ final class invoice_flow_test extends invoice_testcase {
         $this->http->customers[$customerid]['address'] = ['line1' => 'Billing Street', 'country' => 'DE'];
     }
 
-    public function test_returning_purchase_reopens_invoice_but_unfinished_billing_is_rejected(): void {
+    public function test_returning_purchase_reopens_invoice_and_restarts_unfinished_billing(): void {
         global $DB;
         [$id, $token] = $this->start();
-        $sessioncount = count($this->http->sessions);
-
-        $this->assert_error('invoicealreadyactive', fn() => $this->start_url());
-        $this->assertSame($sessioncount, count($this->http->sessions));
+        $original = $this->repository->find_by_id($id);
+        $firstsessionid = $original->portalsessionid;
+        $this->assertStringStartsWith('https://billing.stripe.com/', $this->start_url(country: 'FR', tax: true));
+        $secondtoken = $this->last_portal_token();
+        $record = $this->repository->find_by_id($id);
+        $this->assertNotSame($token, $secondtoken);
+        $this->assertNotEmpty($firstsessionid);
+        $this->assertNotSame($firstsessionid, $record->portalsessionid);
+        $this->assertSame($original->timeexpires, $record->timeexpires);
+        $this->assertSame($original->customerid, $record->customerid);
+        $this->assertSame($original->amount, $record->amount);
+        $this->assertSame($original->description, $record->description);
+        $this->assertSame($original->paymentaccountid, $record->paymentaccountid);
+        $this->assertSame('DE', $record->banktransfercountry);
+        $this->assertFalse($record->automatictax);
+        $this->assertSame('exclusive', $record->taxbehavior);
         $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
 
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->cancel_billing($id, $this->userid, $token)
+        );
+
+        $record->timecreated -= 15 * MINSECS;
+        $record->timeexpires = time() + HOURSECS - 15 * MINSECS;
+        $this->repository->save($record);
+        $expiry = $record->timeexpires;
+        $this->assertStringStartsWith('https://billing.stripe.com/', $this->start_url());
+        $thirdtoken = $this->last_portal_token();
+        $record = $this->repository->find_by_id($id);
+        $this->assertNotSame($secondtoken, $thirdtoken);
+        $this->assertSame($expiry, $record->timeexpires);
+        $this->assertSame(3, count($this->http->sessions));
+        $this->service->cancel_billing($id, $this->userid, $thirdtoken);
+        $this->assertSame('cancelled', $this->repository->find_by_id($id)->status);
+        $this->assertCount(0, $this->http->invoices);
+
+        $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+    }
+
+    public function test_failed_portal_creation_leaves_billing_request_restartable(): void {
+        global $DB;
+        $this->http->failbefore = '/v1/billing_portal/sessions';
+        try {
+            $this->start_url();
+            $this->fail('Expected Portal creation failure');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertSame('Simulated failure before remote write', $e->getMessage());
+        }
+        $record = $DB->get_record('paygw_stripe_invoices', ['userid' => $this->userid], '*', MUST_EXIST);
+        $expiry = (int)$record->timeexpires;
+        $customerid = $record->customerid;
+        $this->assertNull($record->portalsessionid);
+        $this->assertSame(0, count($this->http->sessions));
+
+        [$id, $token] = $this->start();
+        $record = $this->repository->find_by_id($id);
+        $this->assertSame($customerid, $record->customerid);
+        $this->assertSame($expiry, $record->timeexpires);
+        $this->assertSame(hash('sha256', $token), $record->tokenhash);
+        $this->assertNotEmpty($record->portalsessionid);
+        $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+    }
+
+    public function test_lost_portal_response_leaves_request_restartable(): void {
+        global $DB;
+        $this->http->lose = '/v1/billing_portal/sessions';
+        try {
+            $this->start_url();
+            $this->fail('Expected Portal response loss');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertSame('Simulated response loss after remote write', $e->getMessage());
+        }
+        $record = $DB->get_record('paygw_stripe_invoices', ['userid' => $this->userid], '*', MUST_EXIST);
+        $expiry = (int)$record->timeexpires;
+        $this->assertNull($record->portalsessionid);
+        $this->assertSame(1, count($this->http->sessions));
+
+        [$id, $token] = $this->start();
+        $record = $this->repository->find_by_id($id);
+        $this->assertSame($expiry, $record->timeexpires);
+        $this->assertSame(hash('sha256', $token), $record->tokenhash);
+        $this->assertNotEmpty($record->portalsessionid);
+        $this->assertSame(2, count($this->http->sessions));
+        $this->assertSame(1, $DB->count_records('paygw_stripe_invoices'));
+    }
+
+    public function test_missing_portal_session_id_is_replaced_before_completion(): void {
+        [$id, $token] = $this->start();
+        $record = $this->repository->find_by_id($id);
+        $record->portalsessionid = null;
+        $this->repository->save($record);
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
+
+        [$retriedid, $newtoken] = $this->start();
+        $this->assertSame($id, $retriedid);
+        $this->assertNotSame($token, $newtoken);
+        $this->assertNotEmpty($this->repository->find_by_id($id)->portalsessionid);
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
+    }
+
+    public function test_expired_billing_is_marked_and_replaced(): void {
+        global $DB;
+        [$id] = $this->start();
+        $record = $this->repository->find_by_id($id);
+        $record->timeexpires = time() - 1;
+        $this->repository->save($record);
+
+        [$replacementid] = $this->start();
+        $this->assertNotSame($id, $replacementid);
+        $this->assertSame('expired', $this->repository->find_by_id($id)->status);
+        $this->assertSame('billing', $this->repository->find_by_id($replacementid)->status);
+        $this->assertSame(2, $DB->count_records('paygw_stripe_invoices'));
+        $this->assertSame(2, count($this->http->sessions));
+    }
+
+    public function test_returning_open_invoice_reopens_but_never_duplicates_it(): void {
+        global $DB;
+        [$id, $token] = $this->start();
         $invoiceid = $this->complete($id, $token);
-        $this->assertSame('open', $this->http->invoices[$invoiceid]['status']);
         $record = $this->repository->find_by_id($id);
         $record->timeexpires = time() - DAYSECS;
         $this->repository->save($record);
         $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url());
-        $this->assertSame($sessioncount, count($this->http->sessions));
-        $this->assertCount(1, $this->http->invoices);
-        $this->assertCount(1, $this->http->sent);
-
         [$other] = $this->start(itemid: $this->create_fee_instance());
         $this->assertNotSame($id, $other);
         $this->assertSame(2, $DB->count_records('paygw_stripe_invoices'));
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertCount(1, $this->http->sent);
     }
 
     public function test_returning_purchase_checks_stripe_status_and_waits_for_paid_webhook(): void {
@@ -287,7 +426,9 @@ final class invoice_flow_test extends invoice_testcase {
         global $DB;
         [$id, $token] = $this->start(itemid: $this->create_fee_instance());
         $session = end($this->http->sessions);
-        $this->assertStringNotContainsString($token, $session['return_url']);
+        parse_str(parse_url($session['return_url'], PHP_URL_QUERY), $returnquery);
+        $this->assertSame($token, $returnquery['token']);
+        $this->assertNotEmpty($returnquery['sesskey']);
         $this->assertSame('customer_update', $session['flow_data']['type']);
         $this->assertSame(
             ['name', 'address', 'email', 'tax_id'],
@@ -306,6 +447,14 @@ final class invoice_flow_test extends invoice_testcase {
             fn() => $this->service->complete_billing($id, $this->userid, str_repeat('a', 64))
         );
         $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->cancel_billing($id, $this->userid + 1, $token)
+        );
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->cancel_billing($id, $this->userid, str_repeat('a', 64))
+        );
+        $this->assert_error(
             'invoicebillingincomplete',
             fn() => $this->service->complete_billing($id, $this->userid, $token)
         );
@@ -322,7 +471,7 @@ final class invoice_flow_test extends invoice_testcase {
             fn() => $this->service->complete_billing($other, $this->userid, $othertoken)
         );
         $this->assertSame('expired', $this->repository->find_by_id($other)->status);
-        $this->service->cancel_billing($id, $this->userid);
+        $this->service->cancel_billing($id, $this->userid, $token);
         $this->assert_error(
             'invalidinvoicecontinuation',
             fn() => $this->service->complete_billing($id, $this->userid, $token)
@@ -434,9 +583,9 @@ final class invoice_flow_test extends invoice_testcase {
     public function test_cancelled_and_expired_billing_release_identity(): void {
         global $DB;
 
-        [$id] = $this->start();
+        [$id, $token] = $this->start();
         $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
-        $this->service->cancel_billing($id, $this->userid);
+        $this->service->cancel_billing($id, $this->userid, $token);
         $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
 
         [$id, $token] = $this->start();
@@ -446,6 +595,44 @@ final class invoice_flow_test extends invoice_testcase {
         $this->repository->save($record);
         $this->assert_error('invalidinvoicecontinuation', fn() => $this->service->complete_billing($id, $this->userid, $token));
         $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+    }
+
+    public function test_expiring_billing_does_not_release_identity_used_by_another_request(): void {
+        global $DB;
+        [$expiredid, $expiredtoken] = $this->start();
+        [$activeid, $activetoken] = $this->start(itemid: $this->create_fee_instance());
+
+        $record = $this->repository->find_by_id($expiredid);
+        $record->timeexpires = time() - 1;
+        $this->repository->save($record);
+
+        $this->assert_error(
+            'invalidinvoicecontinuation',
+            fn() => $this->service->complete_billing($expiredid, $this->userid, $expiredtoken)
+        );
+        $this->assertSame('expired', $this->repository->find_by_id($expiredid)->status);
+        $this->assertSame('billing', $this->repository->find_by_id($activeid)->status);
+        $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+
+        $this->service->cancel_billing($activeid, $this->userid, $activetoken);
+        $this->assertEquals(0, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
+    }
+
+    public function test_cancelling_billing_does_not_release_identity_used_by_creating_request(): void {
+        global $DB;
+        [$billingid, $billingtoken] = $this->start();
+        [$creatingid] = $this->start(itemid: $this->create_fee_instance());
+
+        $record = $this->repository->find_by_id($creatingid);
+        $record->status = 'creating';
+        $record->timeexpires = time() - 1;
+        $this->repository->save($record);
+
+        $this->service->cancel_billing($billingid, $this->userid, $billingtoken);
+
+        $this->assertSame('cancelled', $this->repository->find_by_id($billingid)->status);
+        $this->assertSame('creating', $this->repository->find_by_id($creatingid)->status);
+        $this->assertEquals(1, $DB->get_field('paygw_stripe_customers', 'billingmanaged', ['userid' => $this->userid]));
     }
 
     public function test_invoice_signed_webhook_paid_void_duplicate_and_rollback(): void {
