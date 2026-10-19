@@ -766,6 +766,93 @@ final class invoice_flow_test extends invoice_testcase {
         $this->assertCount(2, $this->http->sent);
     }
 
+    public function test_payment_restart_recovers_uncertain_creation_within_key_lifetime(): void {
+        global $DB;
+        foreach (['create', 'item', 'finalize'] as $failure) {
+            $itemid = $this->create_fee_instance();
+            [$id, $token] = $this->start(itemid: $itemid);
+            $this->billing_details($id);
+            $invoiceid = 'in_' . (count($this->http->invoices) + 1);
+            $this->http->lose = match ($failure) {
+                'create' => '/v1/invoices',
+                'item' => '/v1/invoiceitems',
+                'finalize' => '/v1/invoices/' . $invoiceid . '/finalize',
+            };
+            try {
+                $this->service->complete_billing($id, $this->userid, $token);
+                $this->fail('Expected lost Stripe response');
+            } catch (\Stripe\Exception\ApiConnectionException $e) {
+                $this->assertSame('creating', $this->repository->find_by_id($id)->status);
+            }
+            $tokenhash = $this->repository->find_by_id($id)->tokenhash;
+            $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $this->start_url(itemid: $itemid));
+            $this->assertSame($tokenhash, $this->repository->find_by_id($id)->tokenhash);
+            $this->assertSame('open', $this->repository->find_by_id($id)->status);
+            $this->assertSame(0, $DB->count_records('payments'));
+        }
+        $this->assertCount(3, $this->http->invoices);
+        $this->assertCount(3, $this->http->items);
+        $this->assertCount(3, $this->http->sessions);
+        $this->assertCount(3, $this->http->sent);
+    }
+
+    public function test_known_creation_checkpoints_recover_after_key_expiry(): void {
+        foreach (['restart', 'callback'] as $entrypoint) {
+            foreach (['failbefore', 'lose'] as $failure) {
+                $itemid = $this->create_fee_instance();
+                [$id, $token] = $this->start(itemid: $itemid);
+                $this->billing_details($id);
+                $invoiceid = 'in_' . (count($this->http->invoices) + 1);
+                $this->http->{$failure} = '/v1/invoices/' . $invoiceid . '/finalize';
+                try {
+                    $this->service->complete_billing($id, $this->userid, $token);
+                    $this->fail('Expected finalization failure');
+                } catch (\Stripe\Exception\ApiConnectionException $e) {
+                    $this->assertSame('creating', $this->repository->find_by_id($id)->status);
+                }
+                $record = $this->repository->find_by_id($id);
+                $this->assertSame($invoiceid, $record->invoiceid);
+                $this->assertNotEmpty($record->invoiceitemid);
+                $record->timeconfirmed = time() - 2 * DAYSECS;
+                $this->repository->save($record);
+                $this->http->keys = [];
+
+                $url = $entrypoint === 'restart' ? $this->start_url(itemid: $itemid) :
+                    $this->service->complete_billing($id, $this->userid, $token);
+                $this->assertSame('https://invoice.stripe.com/' . $invoiceid, $url);
+                $this->assertSame('open', $this->repository->find_by_id($id)->status);
+            }
+        }
+        $this->assertCount(4, $this->http->invoices);
+        $this->assertCount(4, $this->http->items);
+        $this->assertCount(4, $this->http->sessions);
+        $this->assertCount(4, $this->http->sent);
+    }
+
+    public function test_invoice_uncertain_old_item_does_not_create_another_item(): void {
+        [$id, $token] = $this->start();
+        $this->billing_details($id);
+        $this->http->lose = '/v1/invoiceitems';
+        try {
+            $this->service->complete_billing($id, $this->userid, $token);
+            $this->fail('Expected lost item response');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertCount(1, $this->http->items);
+        }
+        $record = $this->repository->find_by_id($id);
+        $record->timeconfirmed = time() - DAYSECS;
+        $this->repository->save($record);
+        $this->http->keys = [];
+        $this->assert_error('invoicerecoveryrequired', fn() => $this->start_url());
+        $this->assert_error(
+            'invoicerecoveryrequired',
+            fn() => $this->service->complete_billing($id, $this->userid, $token)
+        );
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertCount(1, $this->http->items);
+        $this->assertSame('draft', $this->http->invoices[$record->invoiceid]['status']);
+    }
+
     public function test_invoice_uncertain_old_creation_does_not_create_another_invoice(): void {
         [$id, $token] = $this->start();
         $this->billing_details($id);
@@ -780,6 +867,7 @@ final class invoice_flow_test extends invoice_testcase {
         $record->timeconfirmed = time() - DAYSECS;
         $this->repository->save($record);
         $this->http->keys = [];
+        $this->assert_error('invoicerecoveryrequired', fn() => $this->start_url());
         $this->assert_error(
             'invoicerecoveryrequired',
             fn() => $this->service->complete_billing($id, $this->userid, $token)

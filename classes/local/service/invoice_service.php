@@ -200,11 +200,13 @@ class invoice_service {
                     }
                     return $this->create_billing_session_locked($record, $user);
                 }
-                if (!$record->invoiceid) {
+                if ($record->status === 'creating') {
+                    $stripeinvoice = $this->create_invoice($record);
+                } else if (!$record->invoiceid) {
                     throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+                } else {
+                    $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
                 }
-
-                $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
                 if (
                     !$this->is_bound($record, $stripeinvoice) ||
                     ($record->amounttotal !== null && $record->amounttotal !== (int) $stripeinvoice->total)
@@ -401,11 +403,6 @@ class invoice_service {
                 $this->repository->save($record);
             }
 
-            // Stripe may forget idempotency keys after 24h. Never retry uncertain writes beyond 23h.
-            if ($record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time()) {
-                throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
-            }
-
             $stripeinvoice = $this->create_invoice($record);
             if (in_array($stripeinvoice->status, ['void', 'uncollectible'], true) || !$stripeinvoice->hosted_invoice_url) {
                 throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
@@ -460,6 +457,12 @@ class invoice_service {
      * @return stripe_invoice
      */
     private function create_invoice(invoice $record): stripe_invoice {
+        // Known objects can be reconciled after key expiry; uncertain creates cannot be replayed.
+        $uncertain = $record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time();
+        if (!$record->invoiceid && $uncertain) {
+            throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+        }
+
         if (!$record->priceid) {
             $cost = $this->major_amount($record->amount, $record->currency);
             $payable = new payable($cost, strtoupper($record->currency), $record->paymentaccountid);
@@ -523,6 +526,9 @@ class invoice_service {
 
         if ($stripeinvoice->status === 'draft') {
             if (!$record->invoiceitemid) {
+                if ($uncertain) {
+                    throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+                }
                 $item = $this->stripe->invoiceItems->create([
                     'customer' => $record->customerid,
                     'invoice' => $record->invoiceid,
