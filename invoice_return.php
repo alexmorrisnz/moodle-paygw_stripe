@@ -32,8 +32,12 @@ require_login();
 require_sesskey();
 
 $id = required_param('request', PARAM_INT);
+$token = required_param('token', PARAM_ALPHANUM);
 $record = (new invoice_repository())->find_by_id($id);
-if (!$record || $record->userid !== (int)$USER->id) {
+if (
+    !$record || $record->userid !== (int)$USER->id || strlen($token) !== 64 ||
+        !hash_equals($record->tokenhash, hash('sha256', $token))
+) {
     throw new moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
 }
 $account = new account($record->paymentaccountid);
@@ -41,6 +45,6 @@ $gateway = $account->get_gateways(false)['stripe'] ?? null;
 if ($gateway) {
     $config = $gateway->get_configuration();
     $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
-    $factory->invoice_service()->cancel_billing($id, (int)$USER->id);
+    $factory->invoice_service()->cancel_billing($id, (int)$USER->id, $token);
 }
 redirect(new moodle_url('/'), get_string('invoicebillingcancelled', 'paygw_stripe'));

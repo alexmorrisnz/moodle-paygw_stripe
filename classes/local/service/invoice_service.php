@@ -23,7 +23,6 @@ use core_payment\local\entities\payable;
 use paygw_stripe\gateway;
 use paygw_stripe\local\model\invoice;
 use paygw_stripe\local\repository\invoice_repository;
-use paygw_stripe\local\repository\customer_repository;
 use Stripe\Event;
 use Stripe\Invoice as stripe_invoice;
 use Stripe\StripeClient;
@@ -60,7 +59,7 @@ class invoice_service {
     }
 
     /**
-     * Reopen a matching invoice, or save a new purchase and collect billing details.
+     * Reopen a matching invoice, or save/resume a purchase and collect billing details.
      *
      * @param object $config
      * @param payable $payable
@@ -93,45 +92,7 @@ class invoice_service {
         $currency = strtolower($payable->get_currency());
         $userid = (int) $USER->id;
         $paymentaccountid = $payable->get_account_id();
-        $existingurl = $this->existing_invoice_url(
-            $userid,
-            $paymentaccountid,
-            $component,
-            $paymentarea,
-            $itemid,
-            $amount,
-            $currency
-        );
-        if ($existingurl !== null) {
-            return $existingurl;
-        }
-
-        (new webhook_service($this->stripe))->ensure_invoice_events($payable->get_account_id());
-
-        $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
-        $token = bin2hex(random_bytes(32));
-        $now = time();
-
-        $record = new invoice(
-            id: null,
-            userid: $userid,
-            paymentaccountid: $paymentaccountid,
-            customerid: $customer->id,
-            component: $component,
-            paymentarea: $paymentarea,
-            itemid: $itemid,
-            amount: $amount,
-            currency: $currency,
-            description: $description,
-            automatictax: !empty($config->enableautomatictax),
-            taxbehavior: $config->defaulttaxbehavior ?? 'inclusive',
-            tokenhash: hash('sha256', $token),
-            timecreated: $now,
-            timeexpires: $now + min((int) $CFG->sessiontimeout, HOURSECS),
-            timemodified: $now,
-            banktransfercountry: $bankcountry,
-            paymentmethodstatus: $bankcountry === null ? 'legacy' : 'pending',
-        );
+        $portalurl = null;
         $lock = $this->purchase_lock($userid, $paymentaccountid, $component, $paymentarea, $itemid);
         try {
             $existingurl = $this->existing_invoice_url(
@@ -141,30 +102,51 @@ class invoice_service {
                 $paymentarea,
                 $itemid,
                 $amount,
-                $currency
+                $currency,
+                $USER
             );
             if ($existingurl !== null) {
                 return $existingurl;
             }
+
+            (new webhook_service($this->stripe))->ensure_invoice_events($paymentaccountid);
+            $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
+            $now = time();
+            $record = new invoice(
+                id: null,
+                userid: $userid,
+                paymentaccountid: $paymentaccountid,
+                customerid: $customer->id,
+                component: $component,
+                paymentarea: $paymentarea,
+                itemid: $itemid,
+                amount: $amount,
+                currency: $currency,
+                description: $description,
+                automatictax: !empty($config->enableautomatictax),
+                taxbehavior: $config->defaulttaxbehavior ?? 'inclusive',
+                tokenhash: hash('sha256', bin2hex(random_bytes(32))),
+                timecreated: $now,
+                timeexpires: $now + min((int) $CFG->sessiontimeout, HOURSECS),
+                timemodified: $now,
+                banktransfercountry: $bankcountry,
+                paymentmethodstatus: $bankcountry === null ? 'legacy' : 'pending',
+            );
             $record = $this->repository->save($record);
+            $recordlock = $this->lock($record->id);
+            try {
+                $record = $this->repository->find_by_id($record->id);
+                $portalurl = $this->create_billing_session_locked($record, $USER);
+            } finally {
+                $recordlock->release();
+            }
         } finally {
             $lock->release();
         }
-
-        $success = new \moodle_url('/payment/gateway/stripe/invoice.php', ['request' => $record->id, 'token' => $token]);
-        $return = new \moodle_url('/payment/gateway/stripe/invoice_return.php', [
-            'request' => $record->id, 'sesskey' => sesskey(),
-        ]);
-        $portal = (new customer_portal_service($this->stripe))->create_session(
-            $customer->id,
-            $success->out(false),
-            $return->out(false),
-            (new locale_service())->get_stripe_locale_for_user($USER)
-        );
-
-        $record->portalsessionid = $portal->id;
-        $this->repository->save($record);
-        return $portal->url;
+        if ($portalurl === null) {
+            throw new \coding_exception('No portal URL was created for a new invoice purchase.');
+        }
+        return $portalurl;
     }
 
     /**
@@ -177,6 +159,7 @@ class invoice_service {
      * @param int $itemid
      * @param int $amount
      * @param string $currency
+     * @param object $user
      * @return string|null Hosted Invoice Page, or null when a new purchase is allowed
      */
     private function existing_invoice_url(
@@ -186,7 +169,8 @@ class invoice_service {
         string $paymentarea,
         int $itemid,
         int $amount,
-        string $currency
+        string $currency,
+        object $user
     ): ?string {
         while (
             $record = $this->repository->find_active_purchase(
@@ -196,8 +180,7 @@ class invoice_service {
                 $paymentarea,
                 $itemid,
                 $amount,
-                $currency,
-                time()
+                $currency
             )
         ) {
             $lock = $this->lock($record->id);
@@ -208,15 +191,22 @@ class invoice_service {
                 }
                 if ($record->status === 'billing') {
                     if ($record->timeexpires < time()) {
+                        $record->status = 'expired';
+                        $record->timemodified = time();
+                        $this->repository->save($record);
+                        (new customer_service($this->stripe))
+                            ->release_invoice_identity_if_unused($record->userid, $record->customerid);
                         continue;
                     }
-                    throw new \moodle_exception('invoicealreadyactive', 'paygw_stripe');
+                    return $this->create_billing_session_locked($record, $user);
                 }
-                if (!$record->invoiceid) {
+                if ($record->status === 'creating') {
+                    $stripeinvoice = $this->create_invoice($record);
+                } else if (!$record->invoiceid) {
                     throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+                } else {
+                    $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
                 }
-
-                $stripeinvoice = $this->stripe->invoices->retrieve($record->invoiceid);
                 if (
                     !$this->is_bound($record, $stripeinvoice) ||
                     ($record->amounttotal !== null && $record->amounttotal !== (int) $stripeinvoice->total)
@@ -239,7 +229,8 @@ class invoice_service {
                 $record->amounttotal = (int) $stripeinvoice->total;
                 $record->timemodified = time();
                 $this->repository->save($record);
-                (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+                (new customer_service($this->stripe))
+                    ->release_invoice_identity_if_unused($record->userid, $record->customerid);
                 $stripeinvoice = $this->configure_invoice_payment_methods($record, $stripeinvoice);
                 $this->send_invoice_email($record, $stripeinvoice);
                 return $stripeinvoice->hosted_invoice_url;
@@ -248,6 +239,45 @@ class invoice_service {
             }
         }
         return null;
+    }
+
+    /**
+     * Replace the continuation before contacting Stripe, so failed or superseded sessions cannot complete.
+     *
+     * The caller must hold the record lock, after taking the purchase lock if it is also needed.
+     *
+     * @param invoice $record
+     * @param object $user
+     * @return string
+     */
+    private function create_billing_session_locked(invoice $record, object $user): string {
+        (new customer_service($this->stripe))->reserve_invoice_identity($record->userid, $record->customerid);
+        $token = bin2hex(random_bytes(32));
+        $record->tokenhash = hash('sha256', $token);
+        $record->portalsessionid = null;
+        $record->timemodified = time();
+        $record = $this->repository->save($record);
+
+        $success = new \moodle_url('/payment/gateway/stripe/invoice.php', [
+            'request' => $record->id,
+            'token' => $token,
+        ]);
+        $return = new \moodle_url('/payment/gateway/stripe/invoice_return.php', [
+            'request' => $record->id,
+            'token' => $token,
+            'sesskey' => sesskey(),
+        ]);
+        $portal = (new customer_portal_service($this->stripe))->create_session(
+            $record->customerid,
+            $success->out(false),
+            $return->out(false),
+            (new locale_service())->get_stripe_locale_for_user($user)
+        );
+
+        $record->portalsessionid = $portal->id;
+        $record->timemodified = time();
+        $this->repository->save($record);
+        return $portal->url;
     }
 
     /**
@@ -302,22 +332,27 @@ class invoice_service {
      *
      * @param int $id
      * @param int $userid
+     * @param string $token Current billing continuation token
      */
-    public function cancel_billing(int $id, int $userid): void {
+    public function cancel_billing(int $id, int $userid, string $token): void {
         $lock = $this->lock($id);
         try {
             $record = $this->repository->find_by_id($id);
-            if (!$record || $record->userid !== $userid) {
+            if (
+                !$record || $record->userid !== $userid || strlen($token) !== 64 ||
+                !hash_equals($record->tokenhash, hash('sha256', $token))
+            ) {
                 throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
             }
 
             if ($record->status === 'billing') {
-                $record->status = 'cancelled';
+                $record->status = $record->timeexpires < time() ? 'expired' : 'cancelled';
                 $record->timemodified = time();
                 $this->repository->save($record);
             }
-            if ($record->status === 'cancelled') {
-                (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+            if (in_array($record->status, ['cancelled', 'expired'], true)) {
+                (new customer_service($this->stripe))
+                    ->release_invoice_identity_if_unused($record->userid, $record->customerid);
             }
         } finally {
             $lock->release();
@@ -348,7 +383,8 @@ class invoice_service {
                 if ($record->timeexpires < time()) {
                     $record->status = 'expired';
                     $this->repository->save($record);
-                    (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+                    (new customer_service($this->stripe))
+                        ->release_invoice_identity_if_unused($record->userid, $record->customerid);
                     throw new \moodle_exception('invalidinvoicecontinuation', 'paygw_stripe');
                 }
 
@@ -365,11 +401,6 @@ class invoice_service {
                 $record->timeconfirmed = time();
                 $record->timemodified = time();
                 $this->repository->save($record);
-            }
-
-            // Stripe may forget idempotency keys after 24h. Never retry uncertain writes beyond 23h.
-            if ($record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time()) {
-                throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
             }
 
             $stripeinvoice = $this->create_invoice($record);
@@ -426,6 +457,12 @@ class invoice_service {
      * @return stripe_invoice
      */
     private function create_invoice(invoice $record): stripe_invoice {
+        // Known objects can be reconciled after key expiry; uncertain creates cannot be replayed.
+        $uncertain = $record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time();
+        if (!$record->invoiceid && $uncertain) {
+            throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+        }
+
         if (!$record->priceid) {
             $cost = $this->major_amount($record->amount, $record->currency);
             $payable = new payable($cost, strtoupper($record->currency), $record->paymentaccountid);
@@ -489,6 +526,9 @@ class invoice_service {
 
         if ($stripeinvoice->status === 'draft') {
             if (!$record->invoiceitemid) {
+                if ($uncertain) {
+                    throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+                }
                 $item = $this->stripe->invoiceItems->create([
                     'customer' => $record->customerid,
                     'invoice' => $record->invoiceid,
@@ -516,7 +556,8 @@ class invoice_service {
 
         if (in_array($stripeinvoice->status, ['open', 'paid'], true)) {
             // Finalization snapshots the invoice's billing identity before profile sync resumes.
-            (new customer_repository())->release_billing_identity($record->userid, $record->customerid);
+            (new customer_service($this->stripe))
+                ->release_invoice_identity_if_unused($record->userid, $record->customerid);
         }
 
         return $stripeinvoice;

@@ -160,6 +160,36 @@ class customer_service {
     }
 
     /**
+     * Keep profile sync disabled while any unexpired billing request uses this identity.
+     *
+     * @param int $userid Moodle user ID
+     * @param string $customerid Stripe customer ID
+     */
+    public function release_invoice_identity_if_unused(int $userid, string $customerid): void {
+        $lock = $this->lock_customer($userid);
+        try {
+            $this->customerrepository->release_billing_identity_if_unused($userid, $customerid, time());
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Reassert profile protection for a persisted billing request.
+     *
+     * @param int $userid Moodle user ID
+     * @param string $customerid Stripe customer ID
+     */
+    public function reserve_invoice_identity(int $userid, string $customerid): void {
+        $lock = $this->lock_customer($userid);
+        try {
+            $this->customerrepository->reserve_billing_identity($userid, $customerid);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
      * Protect customer identity updates across concurrent purchase flows.
      * @param int $userid
      * @return \core\lock\lock

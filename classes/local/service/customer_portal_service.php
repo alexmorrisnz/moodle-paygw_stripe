@@ -95,8 +95,7 @@ class customer_portal_service {
     }
 
     /**
-     * Only Stripe's successful Save redirect receives the secret continuation.
-     * The ordinary Return URL carries no continuation token.
+     * Both return paths carry the current continuation; the ordinary return also requires a sesskey.
      *
      * @param string $customerid
      * @param string $successurl

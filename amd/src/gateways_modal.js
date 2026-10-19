@@ -24,6 +24,12 @@
 import Templates from 'core/templates';
 import Modal from 'core/modal';
 
+let paymentInProgress = false;
+
+window.addEventListener('pageshow', () => {
+    paymentInProgress = false;
+});
+
 const showModalWithPlaceholder = async() => {
     const modal = await Modal.create({
         body: await Templates.render('paygw_stripe/stripe_button_placeholder', {})
@@ -32,6 +38,10 @@ const showModalWithPlaceholder = async() => {
 };
 
 export const process = (component, paymentArea, itemId, description) => {
+    if (paymentInProgress) {
+        return new Promise(() => null);
+    }
+    paymentInProgress = true;
     return showModalWithPlaceholder()
         .then(() => {
             location.href = M.cfg.wwwroot + '/payment/gateway/stripe/pay.php?' +
@@ -40,5 +50,9 @@ export const process = (component, paymentArea, itemId, description) => {
                 '&itemid=' + itemId +
                 '&description=' + description;
             return new Promise(() => null);
+        })
+        .catch(error => {
+            paymentInProgress = false;
+            throw error;
         });
 };

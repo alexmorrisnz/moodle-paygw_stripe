@@ -54,7 +54,7 @@ final class invoice_repository extends base_repository {
     }
 
     /**
-     * Find an active request or undelivered invoice for the same purchase and amount.
+     * Find a matching request, including billing requests that must be expired before replacement.
      * @param int $userid
      * @param int $paymentaccountid
      * @param string $component
@@ -62,7 +62,6 @@ final class invoice_repository extends base_repository {
      * @param int $itemid
      * @param int $amount
      * @param string $currency
-     * @param int $now
      * @return invoice|null
      */
     public function find_active_purchase(
@@ -72,13 +71,11 @@ final class invoice_repository extends base_repository {
         string $paymentarea,
         int $itemid,
         int $amount,
-        string $currency,
-        int $now
+        string $currency
     ): ?invoice {
         $select = 'userid = :userid AND paymentaccountid = :paymentaccountid AND component = :component ' .
             'AND paymentarea = :paymentarea AND itemid = :itemid AND amount = :amount AND currency = :currency ' .
-            'AND (status = :open OR status = :creating OR (status = :paid AND delivered = 0) ' .
-            'OR (status = :billing AND timeexpires >= :now))';
+            'AND (status = :open OR status = :creating OR (status = :paid AND delivered = 0) OR status = :billing)';
         $params = [
             'userid' => $userid,
             'paymentaccountid' => $paymentaccountid,
@@ -91,7 +88,6 @@ final class invoice_repository extends base_repository {
             'creating' => 'creating',
             'paid' => 'paid',
             'billing' => 'billing',
-            'now' => $now,
         ];
         $records = $this->db->get_records_select($this->table(), $select, $params, 'id DESC', '*', 0, 1);
         if (!$records) {
