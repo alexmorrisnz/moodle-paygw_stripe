@@ -56,6 +56,7 @@ if ($subid != null) {
     $subscriptionservice = $factory->subscription_service();
 
     if ($action == 'cancel') {
+        require_sesskey();
         $subscriptionservice->cancel_subscription($subscription);
         redirect(new moodle_url('/payment/gateway/stripe/subscriptions.php'));
     } else if ($action == 'portal') {
