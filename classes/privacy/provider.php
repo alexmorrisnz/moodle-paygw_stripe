@@ -55,6 +55,7 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
             'paygw_stripe_subscriptions',
             [
                 'userid' => 'privacy:metadata:stripe_subscriptions:userid',
+                'delivered' => 'privacy:metadata:stripe_subscriptions:delivered',
             ],
             'privacy:metadata:stripe_subscriptions'
         );

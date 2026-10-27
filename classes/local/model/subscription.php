@@ -38,6 +38,7 @@ final class subscription implements mappable_model {
      * @param string|null $status
      * @param string $productid
      * @param string $priceid
+     * @param bool $delivered Whether initial subscription access has been delivered
      */
     public function __construct(
         /** @var int|null */
@@ -54,6 +55,8 @@ final class subscription implements mappable_model {
         public readonly string $productid,
         /** @var string */
         public readonly string $priceid,
+        /** @var bool */
+        public readonly bool $delivered = false,
     ) {
     }
 
@@ -72,6 +75,25 @@ final class subscription implements mappable_model {
             status: $status,
             productid: $this->productid,
             priceid: $this->priceid,
+            delivered: $this->delivered,
+        );
+    }
+
+    /**
+     * Return a copy with the initial delivery recorded.
+     *
+     * @return self
+     */
+    public function with_delivered(): self {
+        return new self(
+            id: $this->id,
+            userid: $this->userid,
+            subscriptionid: $this->subscriptionid,
+            customerid: $this->customerid,
+            status: $this->status,
+            productid: $this->productid,
+            priceid: $this->priceid,
+            delivered: true,
         );
     }
 
@@ -90,6 +112,7 @@ final class subscription implements mappable_model {
             status: self::nullable_string_field($record, 'status'),
             productid: (string)$record->productid,
             priceid: (string)$record->priceid,
+            delivered: self::to_bool($record->delivered),
         );
     }
 
@@ -107,6 +130,7 @@ final class subscription implements mappable_model {
         $record->status = $this->status;
         $record->productid = $this->productid;
         $record->priceid = $this->priceid;
+        $record->delivered = self::from_bool($this->delivered);
         return $record;
     }
 }

@@ -74,4 +74,14 @@ final class subscription_repository extends base_repository {
         $record = $DB->get_record($this->table(), ['subscriptionid' => $subscriptionid]);
         return $record ? $this->hydrate($record) : null;
     }
+
+    /**
+     * Update Stripe status without overwriting concurrent delivery bookkeeping.
+     *
+     * @param int $id Local subscription ID
+     * @param string|null $status Stripe status
+     */
+    public function update_status(int $id, ?string $status): void {
+        $this->db->set_field($this->table(), 'status', $status, ['id' => $id]);
+    }
 }
