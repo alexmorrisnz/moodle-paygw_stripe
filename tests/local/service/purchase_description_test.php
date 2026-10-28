@@ -75,7 +75,10 @@ final class purchase_description_test extends stripe_testcase {
             ->with(['name' => 'Purchase mod_example / access / 42'])
             ->willReturn(Product::constructFrom(['id' => 'prod_trusted']));
         (new product_pricing_service($this->client))->create_product(
-            'Send payment elsewhere', 'mod_example', 'access', '42'
+            'Send payment elsewhere',
+            'mod_example',
+            'access',
+            '42'
         );
     }
 

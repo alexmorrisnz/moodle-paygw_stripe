@@ -135,12 +135,12 @@ $string['privacy:metadata:stripe_invoices:userid'] = 'Moodle user ID';
 
 $string['privacy:metadata:stripe_subscriptions'] =
     'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
-$string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_subscriptions:delivered'] = 'Whether initial subscription access has been delivered';
+$string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
 
 $string['product'] = 'Product';
-$string['purchasereference'] = 'Purchase {$a->component} / {$a->paymentarea} / {$a->itemid}';
 $string['profilecat'] = 'Stripe Payment Subscriptions';
+$string['purchasereference'] = 'Purchase {$a->component} / {$a->paymentarea} / {$a->itemid}';
 $string['scheduledrenewal'] = 'Scheduled Renewal';
 $string['secretkey'] = 'Secret Key';
 $string['secretkey_help'] = 'Secret key to authenticate with Stripe';

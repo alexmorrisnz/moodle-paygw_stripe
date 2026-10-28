@@ -16,8 +16,6 @@
 
 namespace paygw_stripe\local\service;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Resolves purchase labels without trusting browser-supplied descriptions.
  *

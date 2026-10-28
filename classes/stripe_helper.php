@@ -162,13 +162,15 @@ class stripe_helper {
                 $session = $this->stripe->checkout->sessions->retrieve($event->data->object->id);
                 if ($session->mode === 'subscription') {
                     $userid = (int)($session->metadata->userid ?? 0);
-                    if ($this->subscriptionservice->fulfil_subscription(
-                        $session->id,
-                        $userid,
-                        $metadata['component'],
-                        $metadata['paymentarea'],
-                        (int)$metadata['itemid']
-                    )) {
+                    if (
+                        $this->subscriptionservice->fulfil_subscription(
+                            $session->id,
+                            $userid,
+                            $metadata['component'],
+                            $metadata['paymentarea'],
+                            (int)$metadata['itemid']
+                        )
+                    ) {
                         $url = helper::get_success_url($metadata['component'], $metadata['paymentarea'], $metadata['itemid']);
                         $this->notify_user($userid, 'successful', ['url' => $url->out()]);
                     }

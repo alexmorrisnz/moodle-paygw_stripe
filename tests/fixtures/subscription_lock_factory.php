@@ -16,8 +16,6 @@
 
 namespace paygw_stripe\tests\fixtures;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Real file locks with immediate contention reporting and a simulated waiting writer.
  *

@@ -57,7 +57,7 @@ final class invoice_flow_test extends invoice_testcase {
                     'component' => 'enrol_fee', 'paymentarea' => 'fee', 'itemid' => $this->instanceid,
                 ];
                 $_POST = [];
-                $this->assert_error('redirecterrordetected', function() use ($CFG): void {
+                $this->assert_error('redirecterrordetected', function () use ($CFG): void {
                     global $USER, $PAGE, $OUTPUT;
                     require($CFG->dirroot . '/payment/gateway/stripe/pay.php');
                 });

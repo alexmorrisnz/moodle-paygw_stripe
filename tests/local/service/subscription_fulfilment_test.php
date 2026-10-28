@@ -88,7 +88,11 @@ final class subscription_fulfilment_test extends stripe_testcase {
             'itemid' => $this->instanceid,
         ]);
         $this->session = subscription_test_session_factory::subscription_session(
-            'cs_fulfil', 'sub_fulfil', 'cus_fulfil', 'prod_fulfil', 'price_fulfil'
+            'cs_fulfil',
+            'sub_fulfil',
+            'cus_fulfil',
+            'prod_fulfil',
+            'price_fulfil'
         );
         $this->session->metadata = ['userid' => $this->userid];
         $this->session->status = 'complete';
@@ -203,10 +207,18 @@ final class subscription_fulfilment_test extends stripe_testcase {
      */
     public function test_rejects_foreign_user_and_product(): void {
         $this->assert_error('invalidsessionbinding', fn() => $this->service->fulfil_subscription(
-            'cs_fulfil', $this->userid + 1, 'enrol_fee', 'fee', $this->instanceid
+            'cs_fulfil',
+            $this->userid + 1,
+            'enrol_fee',
+            'fee',
+            $this->instanceid
         ));
         $this->assert_error('invalidsessionbinding', fn() => $this->service->fulfil_subscription(
-            'cs_fulfil', $this->userid, 'enrol_fee', 'fee', $this->instanceid + 1
+            'cs_fulfil',
+            $this->userid,
+            'enrol_fee',
+            'fee',
+            $this->instanceid + 1
         ));
     }
 
@@ -265,7 +277,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
     public function test_delivery_is_checked_after_lock_acquisition(): void {
         global $DB;
 
-        subscription_lock_factory::$beforelock = function(): void {
+        subscription_lock_factory::$beforelock = function (): void {
             $this->assertTrue($this->fulfil());
         };
         $this->assertFalse($this->fulfil());
@@ -339,7 +351,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
             'apikey' => 'pk_test_fake', 'secretkey' => 'sk_test_fake',
         ]), ['accountid' => $accountid, 'gateway' => 'stripe']);
         $http = $this->createMock(ClientInterface::class);
-        $http->method('request')->willReturnCallback(function($method, $url): array {
+        $http->method('request')->willReturnCallback(function ($method, $url): array {
             $this->assertSame('get', $method);
             if ($url === 'https://api.stripe.com/v1/checkout/sessions/cs_fulfil') {
                 return [json_encode($this->session->toArray()), 200, []];
@@ -357,13 +369,13 @@ final class subscription_fulfilment_test extends stripe_testcase {
         ];
         $_POST = [];
         try {
-            $this->assert_error('redirecterrordetected', function() use ($CFG): void {
+            $this->assert_error('redirecterrordetected', function () use ($CFG): void {
                 global $USER, $PAGE, $OUTPUT;
                 require($CFG->dirroot . '/payment/gateway/stripe/process.php');
             });
             $enrolment = $DB->get_record('user_enrolments', ['enrolid' => $this->instanceid], '*', MUST_EXIST);
             $DB->set_field('user_enrolments', 'timeend', $enrolment->timeend - DAYSECS, ['id' => $enrolment->id]);
-            $this->assert_error('redirecterrordetected', function() use ($CFG): void {
+            $this->assert_error('redirecterrordetected', function () use ($CFG): void {
                 global $USER, $PAGE, $OUTPUT;
                 require($CFG->dirroot . '/payment/gateway/stripe/process.php');
             });

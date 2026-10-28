@@ -16,8 +16,6 @@
 
 namespace paygw_stripe\payment;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Fee delivery with controllable failure after enrolment for transaction tests.
  *
