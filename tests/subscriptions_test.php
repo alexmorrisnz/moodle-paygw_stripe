@@ -31,6 +31,7 @@ require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.ph
  *
  * @package paygw_stripe
  * @category test
+ * @coversNothing
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -121,6 +122,7 @@ final class subscriptions_test extends \advanced_testcase {
     /**
      * Rejected cancellation requests must not contact Stripe or remove access.
      *
+     * @dataProvider rejected_requests_provider
      * @param string $method Request method
      * @param string|null $token Token validity, or null to omit it
      * @param string $error Expected error code
@@ -163,6 +165,7 @@ final class subscriptions_test extends \advanced_testcase {
     /**
      * A valid session key permits cancellation and removal of the fee enrolment.
      *
+     * @dataProvider valid_requests_provider
      * @param string $method Request method
      */
     #[DataProvider('valid_requests_provider')]

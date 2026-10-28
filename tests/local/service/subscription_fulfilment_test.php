@@ -44,6 +44,8 @@ require_once(__DIR__ . '/../../fixtures/subscription_lock_factory.php');
  *
  * @package paygw_stripe
  * @category test
+ * @covers \paygw_stripe\local\service\subscription_service
+ * @covers \paygw_stripe\stripe_helper
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -160,6 +162,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
     /**
      * Unpaid or incomplete purchases cannot grant initial access.
      *
+     * @dataProvider ineligible_provider
      * @param string $status Subscription status
      * @param string $paymentstatus Checkout payment status
      * @param string $checkoutstatus Checkout status
@@ -189,6 +192,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
     /**
      * Free initial periods still grant access exactly once.
      *
+     * @dataProvider free_period_provider
      * @param string $status Subscription status
      */
     #[DataProvider('free_period_provider')]
@@ -234,6 +238,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
     /**
      * A failed callback leaves a safely retryable purchase.
      *
+     * @dataProvider failure_provider
      * @param string $failure Callback failure mode
      */
     #[DataProvider('failure_provider')]
@@ -296,6 +301,7 @@ final class subscription_fulfilment_test extends stripe_testcase {
     /**
      * Async notification and browser return share the same delivery guard.
      *
+     * @dataProvider arrival_order_provider
      * @param bool $browserfirst Whether the browser delivers first
      */
     #[DataProvider('arrival_order_provider')]

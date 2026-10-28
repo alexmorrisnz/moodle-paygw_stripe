@@ -27,7 +27,7 @@ use paygw_stripe\local\repository\product_repository;
 use paygw_stripe\local\repository\subscription_repository;
 use paygw_stripe\local\service\stripe_service_factory;
 
-require('../../../config.php');
+require_once(__DIR__ . '/../../../config.php');
 
 require_login();
 
