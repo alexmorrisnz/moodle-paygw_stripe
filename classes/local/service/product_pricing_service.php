@@ -93,6 +93,7 @@ class product_pricing_service {
      * @throws \dml_exception
      */
     public function create_product(string $description, string $component, string $paymentarea, string $itemid): Product {
+        $description = purchase_description::get($component, $paymentarea, (int)$itemid);
         $product = $this->stripe->products->create([
             'name' => $description,
         ]);
@@ -196,6 +197,7 @@ class product_pricing_service {
         string $itemid,
         ?array $subscription = null
     ) {
+        $description = purchase_description::get($component, $paymentarea, (int)$itemid);
         $unitamount = $this->get_unit_amount($cost, $payable->get_currency());
         $currency = strtolower($payable->get_currency());
 

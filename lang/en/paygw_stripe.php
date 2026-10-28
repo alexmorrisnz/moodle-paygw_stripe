@@ -139,6 +139,7 @@ $string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
 $string['privacy:metadata:stripe_subscriptions:delivered'] = 'Whether initial subscription access has been delivered';
 
 $string['product'] = 'Product';
+$string['purchasereference'] = 'Purchase {$a->component} / {$a->paymentarea} / {$a->itemid}';
 $string['profilecat'] = 'Stripe Payment Subscriptions';
 $string['scheduledrenewal'] = 'Scheduled Renewal';
 $string['secretkey'] = 'Secret Key';
