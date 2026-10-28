@@ -23,7 +23,6 @@ use paygw_stripe\payment\service_provider;
 use paygw_stripe\stripe_helper;
 use paygw_stripe\tests\fixtures\stripe_testcase;
 use paygw_stripe\tests\fixtures\subscription_lock_factory;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Stripe\ApiRequestor;
 use Stripe\Checkout\Session;
@@ -49,8 +48,6 @@ require_once(__DIR__ . '/../../fixtures/subscription_lock_factory.php');
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversClass(subscription_service::class)]
-#[CoversClass(stripe_helper::class)]
 final class subscription_fulfilment_test extends stripe_testcase {
     /** @var subscription_service Service under test. */
     private subscription_service $service;

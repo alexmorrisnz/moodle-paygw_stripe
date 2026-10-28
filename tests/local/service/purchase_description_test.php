@@ -20,7 +20,6 @@ defined('MOODLE_INTERNAL') || die();
 
 use core_payment\local\entities\payable;
 use paygw_stripe\tests\fixtures\stripe_testcase;
-use PHPUnit\Framework\Attributes\CoversClass;
 use Stripe\Collection;
 use Stripe\Price;
 use Stripe\Product;
@@ -38,8 +37,6 @@ require_once(__DIR__ . '/../../fixtures/stripe_testcase.php');
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversClass(purchase_description::class)]
-#[CoversClass(product_pricing_service::class)]
 final class purchase_description_test extends stripe_testcase {
     /**
      * Fee labels use the stored course name rather than caller text.

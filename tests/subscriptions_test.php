@@ -20,7 +20,6 @@ defined('MOODLE_INTERNAL') || die();
 
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
-use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 global $CFG;
@@ -35,7 +34,6 @@ require_once($CFG->dirroot . '/payment/gateway/stripe/.extlib/stripe-php/init.ph
  * @copyright 2026 Moodle Stripe contributors
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversNothing]
 final class subscriptions_test extends \advanced_testcase {
     /** @var int Subscription owner's user ID. */
     private int $userid;
