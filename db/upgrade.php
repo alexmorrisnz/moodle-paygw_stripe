@@ -392,5 +392,18 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026100400, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2026102700) {
+        $table = new xmldb_table('paygw_stripe_subscriptions');
+        $field = new xmldb_field('delivered', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'priceid');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Historical rows cannot distinguish delivery from an interrupted initial checkout.
+        // Prevent old success URLs from granting access or recording payments again.
+        $DB->set_field('paygw_stripe_subscriptions', 'delivered', 1);
+        upgrade_plugin_savepoint(true, 2026102700, 'paygw', 'stripe');
+    }
+
     return true;
 }

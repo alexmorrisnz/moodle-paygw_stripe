@@ -19,6 +19,7 @@ declare(strict_types=1);
 namespace paygw_stripe\local\service;
 
 use core_payment\local\entities\payable;
+use core_payment\helper;
 use DateInterval;
 use DateTime;
 use DateTimeZone;
@@ -105,8 +106,7 @@ class subscription_service {
 
         $msub = $this->subscriptionrepository->find_by_subscriptionid($session->subscription);
         if ($msub != null) {
-            $msub = $msub->with_status($subscription->status);
-            $this->subscriptionrepository->save($msub);
+            $this->subscriptionrepository->update_status($msub->id, $subscription->status);
             return;
         }
 
@@ -120,6 +120,96 @@ class subscription_service {
             $session->line_items->first()->price->id
         );
         $this->subscriptionrepository->save($record);
+    }
+
+    /**
+     * Deliver initial subscription access once, shared by browser returns and webhooks.
+     *
+     * @param string $sessionid Checkout session ID
+     * @param int $userid Purchasing user ID
+     * @param string $component Payment component
+     * @param string $paymentarea Payment area
+     * @param int $itemid Purchased item ID
+     * @return bool False when this subscription was already delivered
+     */
+    public function fulfil_subscription(
+        string $sessionid,
+        int $userid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): bool {
+        global $DB;
+
+        $session = $this->stripe->checkout->sessions->retrieve($sessionid, ['expand' => ['line_items', 'customer']]);
+        if (!$this->session_matches_request($session, $userid, $component, $paymentarea, $itemid)) {
+            throw new \moodle_exception('invalidsessionbinding', 'paygw_stripe');
+        }
+        if (!$session->subscription || $session->status !== 'complete') {
+            throw new \moodle_exception('subscriptionerror', 'paygw_stripe');
+        }
+
+        $factory = \core\lock\lock_config::get_lock_factory('paygw_stripe');
+        $lock = $factory->get_lock('subscription_' . hash('sha256', $session->subscription), 10);
+        if (!$lock) {
+            throw new \moodle_exception('locktimeout');
+        }
+        try {
+            $record = $this->subscriptionrepository->find_by_subscriptionid($session->subscription);
+            if ($record && ($record->userid !== $userid || $record->productid !== $session->line_items->first()->price->product)) {
+                throw new \moodle_exception('invalidsessionbinding', 'paygw_stripe');
+            }
+            if ($record && $record->delivered) {
+                return false;
+            }
+
+            $subscription = $this->stripe->subscriptions->retrieve($session->subscription);
+            if (
+                !in_array($subscription->status, ['active', 'trialing'], true) ||
+                !in_array($session->payment_status, ['paid', 'no_payment_required'], true)
+            ) {
+                throw new \moodle_exception('subscriptionerror', 'paygw_stripe');
+            }
+
+            $transaction = $DB->start_delegated_transaction();
+            try {
+                $record = new subscription(
+                    $record ? $record->id : null,
+                    $userid,
+                    $session->subscription,
+                    $session->customer->id,
+                    $subscription->status,
+                    $session->line_items->first()->price->product,
+                    $session->line_items->first()->price->id
+                );
+                $payable = helper::get_payable($component, $paymentarea, $itemid);
+                $cost = helper::get_rounded_cost(
+                    $payable->get_amount(),
+                    $payable->get_currency(),
+                    helper::get_gateway_surcharge('stripe')
+                );
+                $paymentid = helper::save_payment(
+                    $payable->get_account_id(),
+                    $component,
+                    $paymentarea,
+                    $itemid,
+                    $userid,
+                    $cost,
+                    $payable->get_currency(),
+                    'stripe'
+                );
+                if (!helper::deliver_order($component, $paymentarea, $itemid, $paymentid, $userid)) {
+                    throw new \moodle_exception('subscriptiondeliveryfailed', 'paygw_stripe');
+                }
+                $this->subscriptionrepository->save($record->with_delivered());
+                $transaction->allow_commit();
+            } catch (\Throwable $e) {
+                $transaction->rollback($e);
+            }
+            return true;
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -142,7 +232,7 @@ class subscription_service {
      */
     public function sync_status(subscription $moodlesub): void {
         $subscription = $this->stripe->subscriptions->retrieve($moodlesub->subscriptionid);
-        $this->subscriptionrepository->save($moodlesub->with_status($subscription->status));
+        $this->subscriptionrepository->update_status($moodlesub->id, $subscription->status);
     }
 
     /**
@@ -329,8 +419,7 @@ class subscription_service {
         }
 
         $msub = $this->subscriptionrepository->find_by_subscriptionid($moodlesub->subscriptionid);
-        $msub = $msub->with_status($subscription->status);
-        $this->subscriptionrepository->save($msub);
+        $this->subscriptionrepository->update_status($msub->id, $subscription->status);
 
         $product = $this->productrepository->find_by_productid($moodlesub->productid);
         if ($product->component == 'enrol_fee') {
@@ -548,12 +637,32 @@ class subscription_service {
             'expand' => ['line_items', 'subscription'],
         ]);
 
+        return $this->session_matches_request($session, $userid, $component, $paymentarea, $itemid);
+    }
+
+    /**
+     * Validate the purchaser and product of a retrieved subscription Checkout session.
+     *
+     * @param Session $session Stripe Checkout session
+     * @param int $userid Purchasing user ID
+     * @param string $component Payment component
+     * @param string $paymentarea Payment area
+     * @param int $itemid Purchased item ID
+     * @return bool
+     */
+    private function session_matches_request(
+        Session $session,
+        int $userid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): bool {
         if ($session->mode !== 'subscription') {
             return false;
         }
 
         // Prefer metadata user binding.
-        if ((int)($session->metadata->userid ?? 0) !== $userid) {
+        if ($userid <= 0 || (int)($session->metadata->userid ?? 0) !== $userid) {
             return false;
         }
 

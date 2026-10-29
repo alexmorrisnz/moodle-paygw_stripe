@@ -27,7 +27,7 @@ use paygw_stripe\local\repository\product_repository;
 use paygw_stripe\local\repository\subscription_repository;
 use paygw_stripe\local\service\stripe_service_factory;
 
-require('../../../config.php');
+require_once(__DIR__ . '/../../../config.php');
 
 require_login();
 
@@ -56,6 +56,7 @@ if ($subid != null) {
     $subscriptionservice = $factory->subscription_service();
 
     if ($action == 'cancel') {
+        require_sesskey();
         $subscriptionservice->cancel_subscription($subscription);
         redirect(new moodle_url('/payment/gateway/stripe/subscriptions.php'));
     } else if ($action == 'portal') {

@@ -23,6 +23,7 @@
  */
 
 use core_payment\helper;
+use paygw_stripe\local\service\purchase_description;
 use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 
@@ -34,7 +35,7 @@ require_login();
 $component = required_param('component', PARAM_ALPHANUMEXT);
 $paymentarea = required_param('paymentarea', PARAM_ALPHANUMEXT);
 $itemid = required_param('itemid', PARAM_INT);
-$description = required_param('description', PARAM_TEXT);
+$description = purchase_description::get($component, $paymentarea, $itemid);
 $sessionid = optional_param('session_id', null, PARAM_TEXT);
 
 $config = (object) helper::get_gateway_configuration($component, $paymentarea, $itemid, 'stripe');

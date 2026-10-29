@@ -97,7 +97,7 @@ final class invoice_upgrade_test extends invoice_testcase {
         require_once($CFG->dirroot . '/payment/gateway/stripe/db/upgrade.php');
         set_config('version', 2026092400, 'paygw_stripe');
         $this->assertTrue(xmldb_paygw_stripe_upgrade(2026092400));
-        $this->assertSame(2026100400, (int)get_config('paygw_stripe', 'version'));
+        $this->assertSame(2026102700, (int)get_config('paygw_stripe', 'version'));
         $this->assertSame([], $this->http->requests);
         $after = $DB->get_record('paygw_stripe_invoices', ['id' => $id], '*', MUST_EXIST);
         $this->assertEquals($before, $after);

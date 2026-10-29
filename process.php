@@ -60,17 +60,12 @@ if ($sessionmode === 'subscription') {
         redirect(new moodle_url('/'), get_string('invalidsessionbinding', 'paygw_stripe'));
     }
 
-    $subscriptionstatus = $subscriptionservice->get_subscription_status($sessionid);
-    if (!in_array($subscriptionstatus, ['incomplete', 'incomplete_expired', 'canceled'])) {
-        $checkoutservice->save_payment_status($sessionid);
-        $stripehelper->deliver_course($component, $paymentarea, $itemid, (int)$USER->id);
-
-        // Find redirection.
-        $url = helper::get_success_url($component, $paymentarea, $itemid);
-        redirect($url, get_string('subscriptionsuccessful', 'paygw_stripe'), 0, 'success');
-    } else {
-        redirect(new moodle_url('/'), get_string('subscriptionerror', 'paygw_stripe'));
+    if (!$subscriptionservice->fulfil_subscription($sessionid, (int)$USER->id, $component, $paymentarea, $itemid)) {
+        redirect(new moodle_url('/'), get_string('alreadydeliveredcourse', 'paygw_stripe'));
     }
+
+    $url = helper::get_success_url($component, $paymentarea, $itemid);
+    redirect($url, get_string('subscriptionsuccessful', 'paygw_stripe'), 0, 'success');
 } else if ($sessionmode === 'payment') {
     if (
         !$checkoutservice->is_session_bound_to_request(

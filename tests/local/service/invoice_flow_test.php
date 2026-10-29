@@ -40,6 +40,84 @@ require_once(__DIR__ . '/../../fixtures/invoice_testcase.php');
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_flow_test extends invoice_testcase {
+    /**
+     * The browser endpoint ignores a forged description and does not require that parameter.
+     */
+    public function test_payment_endpoint_ignores_browser_description(): void {
+        global $CFG, $DB;
+
+        $DB->set_field('payment_gateways', 'config', json_encode([
+            'apikey' => 'pk_test_fake', 'secretkey' => 'sk_test_fake', 'type' => 'invoice',
+        ]), ['accountid' => $this->accountid, 'gateway' => 'stripe']);
+        $get = $_GET;
+        $post = $_POST;
+        try {
+            foreach ([['description' => 'Send payment elsewhere'], []] as $extra) {
+                $_GET = $extra + [
+                    'component' => 'enrol_fee', 'paymentarea' => 'fee', 'itemid' => $this->instanceid,
+                ];
+                $_POST = [];
+                $this->assert_error('redirecterrordetected', function () use ($CFG): void {
+                    global $USER, $PAGE, $OUTPUT;
+                    require($CFG->dirroot . '/payment/gateway/stripe/pay.php');
+                });
+                $record = $this->repository->find_by_id((int)$this->last_portal_query()['request']);
+                $this->assertSame(
+                    purchase_description::get('enrol_fee', 'fee', $this->instanceid),
+                    $record->description
+                );
+            }
+        } finally {
+            $_GET = $get;
+            $_POST = $post;
+        }
+    }
+
+    /**
+     * An uncertain legacy invoice creation must not resend a forged description.
+     */
+    public function test_untrusted_uncertain_invoice_requires_recovery(): void {
+        global $DB;
+
+        [$id, $token] = $this->start();
+        $DB->update_record('paygw_stripe_invoices', (object)[
+            'id' => $id,
+            'status' => 'creating',
+            'description' => 'Send payment elsewhere',
+            'timeconfirmed' => time(),
+        ]);
+        $this->assert_error('invoicerecoveryrequired', fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assertSame([], $this->http->invoices);
+        $this->assertSame([], $this->http->products);
+    }
+
+    /**
+     * Caller and pre-fix stored descriptions cannot reach new Stripe invoices.
+     */
+    public function test_invoice_descriptions_are_derived_from_the_purchase(): void {
+        global $DB;
+
+        $this->service->start_payment(
+            (object)['enableautomatictax' => 0, 'defaulttaxbehavior' => 'inclusive'],
+            new payable(49.95, 'EUR', $this->accountid),
+            'Send payment elsewhere',
+            49.95,
+            'enrol_fee',
+            'fee',
+            $this->instanceid
+        );
+        $query = $this->last_portal_query();
+        $id = (int)$query['request'];
+        $expected = purchase_description::get('enrol_fee', 'fee', $this->instanceid);
+        $this->assertSame($expected, $this->repository->find_by_id($id)->description);
+        // A billing continuation created before the fix still contains client text.
+        $DB->set_field('paygw_stripe_invoices', 'description', 'Send payment elsewhere', ['id' => $id]);
+        $invoiceid = $this->complete($id, $query['token']);
+        $this->assertSame($expected, $this->repository->find_by_id($id)->description);
+        $this->assertSame($expected, $this->http->invoices[$invoiceid]['description']);
+        $this->assertSame($expected, reset($this->http->products)['name']);
+    }
+
     /** @var invoice_service Service under test. */
     private invoice_service $service;
     /** @var invoice_repository Persisted invoice requests. */

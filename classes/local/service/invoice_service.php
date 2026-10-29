@@ -122,7 +122,7 @@ class invoice_service {
                 itemid: $itemid,
                 amount: $amount,
                 currency: $currency,
-                description: $description,
+                description: purchase_description::get($component, $paymentarea, $itemid),
                 automatictax: !empty($config->enableautomatictax),
                 taxbehavior: $config->defaulttaxbehavior ?? 'inclusive',
                 tokenhash: hash('sha256', bin2hex(random_bytes(32))),
@@ -397,6 +397,7 @@ class invoice_service {
                     throw new \moodle_exception('invoicebillingincomplete', 'paygw_stripe');
                 }
 
+                $record->description = purchase_description::get($record->component, $record->paymentarea, $record->itemid);
                 $record->status = 'creating';
                 $record->timeconfirmed = time();
                 $record->timemodified = time();
@@ -460,6 +461,14 @@ class invoice_service {
         // Known objects can be reconciled after key expiry; uncertain creates cannot be replayed.
         $uncertain = $record->status === 'creating' && $record->timeconfirmed + 23 * HOURSECS < time();
         if (!$record->invoiceid && $uncertain) {
+            throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
+        }
+
+        if (
+            !$record->invoiceid &&
+            $record->description !== purchase_description::get($record->component, $record->paymentarea, $record->itemid)
+        ) {
+            // Do not change parameters of a possibly accepted pre-fix idempotent request.
             throw new \moodle_exception('invoicerecoveryrequired', 'paygw_stripe');
         }
 

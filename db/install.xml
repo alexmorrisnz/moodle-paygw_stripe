@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="payment/gateway/stripe/db" VERSION="20260925" COMMENT="XMLDB file for Stripe payment gateway plugin"
+<XMLDB PATH="payment/gateway/stripe/db" VERSION="20261027" COMMENT="XMLDB file for Stripe payment gateway plugin"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
@@ -71,6 +71,7 @@
         <FIELD NAME="status" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Session status"/>
         <FIELD NAME="productid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe product ID"/>
         <FIELD NAME="priceid" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Stripe price ID"/>
+        <FIELD NAME="delivered" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Initial subscription access delivered"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>

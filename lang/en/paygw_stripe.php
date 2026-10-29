@@ -135,16 +135,19 @@ $string['privacy:metadata:stripe_invoices:userid'] = 'Moodle user ID';
 
 $string['privacy:metadata:stripe_subscriptions'] =
     'Stores the relation from subscriptions in Moodle to Stripe subscription objects';
+$string['privacy:metadata:stripe_subscriptions:delivered'] = 'Whether initial subscription access has been delivered';
 $string['privacy:metadata:stripe_subscriptions:userid'] = 'Moodle user ID';
 
 $string['product'] = 'Product';
 $string['profilecat'] = 'Stripe Payment Subscriptions';
+$string['purchasereference'] = 'Purchase {$a->component} / {$a->paymentarea} / {$a->itemid}';
 $string['scheduledrenewal'] = 'Scheduled Renewal';
 $string['secretkey'] = 'Secret Key';
 $string['secretkey_help'] = 'Secret key to authenticate with Stripe';
 $string['status'] = 'Status';
 $string['stripeaccount'] = 'Stripe account ID';
 $string['stripeaccount_help'] = 'For creating the direct charge branding page';
+$string['subscriptiondeliveryfailed'] = 'The subscription order could not be delivered. Please try again or contact the site administrator.';
 $string['subscriptionerror'] = 'There was an error creating the subscription, please contact the site administrator for help';
 $string['subscriptioninterval'] = 'Subscription Period';
 $string['subscriptioninvalid'] = 'Invalid subscription, please contact the site administrator for help';
