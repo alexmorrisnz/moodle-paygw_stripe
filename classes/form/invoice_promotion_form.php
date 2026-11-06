@@ -33,7 +33,9 @@ final class invoice_promotion_form extends \moodleform {
     /** @var array|null Validated selection from the current POST. */
     private ?array $selection = null;
 
-    /** Define the optional code editor and explicit continuation. */
+    /**
+     * Define the optional code editor and explicit continuation.
+     */
     public function definition(): void {
         $form = $this->_form;
         foreach (['component' => PARAM_COMPONENT, 'paymentarea' => PARAM_AREA, 'itemid' => PARAM_INT] as $name => $type) {
@@ -94,7 +96,11 @@ final class invoice_promotion_form extends \moodleform {
         return $errors;
     }
 
-    /** @return array|null Validated selection, if submitted successfully. */
+    /**
+     * Get the validated selection.
+     *
+     * @return array|null Validated selection, if submitted successfully.
+     */
     public function get_selection(): ?array {
         return $this->selection;
     }

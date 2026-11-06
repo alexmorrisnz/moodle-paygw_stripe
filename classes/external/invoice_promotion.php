@@ -30,7 +30,11 @@ use paygw_stripe\local\service\invoice_promotion_request;
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_promotion extends external_api {
-    /** @return external_function_parameters Parameters. */
+    /**
+     * Describe the code editor parameters.
+     *
+     * @return external_function_parameters Parameters.
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'component' => new external_value(PARAM_COMPONENT, 'Payment component'),
@@ -51,8 +55,17 @@ final class invoice_promotion extends external_api {
      * @param bool $apply Whether to validate and store a selection.
      * @return array Editor options.
      */
-    public static function execute(string $component, string $paymentarea, int $itemid, string $code = '', bool $apply = false): array {
-        $params = self::validate_parameters(self::execute_parameters(), compact('component', 'paymentarea', 'itemid', 'code', 'apply'));
+    public static function execute(
+        string $component,
+        string $paymentarea,
+        int $itemid,
+        string $code = '',
+        bool $apply = false
+    ): array {
+        $params = self::validate_parameters(
+            self::execute_parameters(),
+            compact('component', 'paymentarea', 'itemid', 'code', 'apply')
+        );
         self::validate_context(\context_system::instance());
         require_login(null, false);
         if (
@@ -73,7 +86,11 @@ final class invoice_promotion extends external_api {
         );
     }
 
-    /** @return external_single_structure Editor response. */
+    /**
+     * Describe the code editor response.
+     *
+     * @return external_single_structure Editor response.
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'enabled' => new external_value(PARAM_BOOL, 'Whether invoice codes are enabled'),

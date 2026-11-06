@@ -71,12 +71,18 @@ final class invoice_promotion_service_test extends \basic_testcase {
         parent::tearDown();
     }
 
-    /** @return array Default valid quote. */
+    /**
+     * Get a default valid quote.
+     *
+     * @return array Default valid quote.
+     */
     private function quote(): array {
         return $this->service->quote(' kurs20 ', 10000, 'EUR', 'cus_learner', 'prod_course');
     }
 
-    /** Assert a rejection with no invoice or redemption side effects. */
+    /**
+     * Assert a rejection with no invoice or redemption side effects.
+     */
     private function invalid(): void {
         try {
             $this->quote();

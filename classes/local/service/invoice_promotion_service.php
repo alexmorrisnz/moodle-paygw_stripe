@@ -32,8 +32,16 @@ use Stripe\StripeClient;
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_promotion_service {
-    /** @param StripeClient $stripe Stripe API client. */
-    public function __construct(private StripeClient $stripe) {
+    /** @var StripeClient Stripe API client. */
+    private StripeClient $stripe;
+
+    /**
+     * Create the promotion validation service.
+     *
+     * @param StripeClient $stripe Stripe API client.
+     */
+    public function __construct(StripeClient $stripe) {
+        $this->stripe = $stripe;
     }
 
     /**

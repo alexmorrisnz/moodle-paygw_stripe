@@ -40,7 +40,9 @@ require_once(__DIR__ . '/../../fixtures/invoice_testcase.php');
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_flow_test extends invoice_testcase {
-    /** Seed a promotion understood by the pinned Stripe SDK. */
+    /**
+     * Seed a promotion understood by the pinned Stripe SDK.
+     */
     private function seed_promotion(): void {
         $this->http->promotioncodes['promo_course'] = [
             'id' => 'promo_course', 'object' => 'promotion_code', 'code' => 'KURS20', 'active' => true,
@@ -55,7 +57,12 @@ final class invoice_flow_test extends invoice_testcase {
         ];
     }
 
-    /** Start an explicitly selected promotion purchase. */
+    /**
+     * Start an explicitly selected promotion purchase.
+     *
+     * @param string|null $codeid Selected promotion code ID.
+     * @return array Request ID and continuation token.
+     */
     private function start_promotion(?string $codeid = 'promo_course'): array {
         $this->service->start_payment(
             (object)['invoicepromotioncodes' => 1, 'enableautomatictax' => 0, 'defaulttaxbehavior' => 'inclusive'],
@@ -72,7 +79,9 @@ final class invoice_flow_test extends invoice_testcase {
         return [(int)$query['request'], $query['token']];
     }
 
-    /** Enable the invoice code-entry page for request and form tests. */
+    /**
+     * Enable the invoice code-entry page for request and form tests.
+     */
     private function enable_promotion_page(): void {
         global $DB;
         $DB->set_field('payment_gateways', 'config', json_encode([
@@ -81,7 +90,11 @@ final class invoice_flow_test extends invoice_testcase {
         ]), ['accountid' => $this->accountid, 'gateway' => 'stripe']);
     }
 
-    /** @return array Parameters for the invoice code-entry page. */
+    /**
+     * Get the invoice code-entry page parameters.
+     *
+     * @return array Parameters for the invoice code-entry page.
+     */
     private function promotion_page_params(): array {
         return ['component' => 'enrol_fee', 'paymentarea' => 'fee', 'itemid' => $this->instanceid];
     }

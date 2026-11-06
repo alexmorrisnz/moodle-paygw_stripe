@@ -16,8 +16,6 @@
 
 namespace paygw_stripe\local\service;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Cross-user, cross-course, expiry and price-binding tests for opaque choices.
  *
