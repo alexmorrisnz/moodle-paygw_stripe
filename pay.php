@@ -57,8 +57,10 @@ if (($config->type ?? '') === 'invoice') {
     $promotioncodeid = null;
     $promotionselected = false;
     $promotiontoken = optional_param('promotionchoice', '', PARAM_ALPHANUM);
-    if (empty($config->invoicepromotioncodes) &&
-        ($promotiontoken !== '' || optional_param('promotioncode', '', PARAM_RAW_TRIMMED) !== '')) {
+    if (
+        empty($config->invoicepromotioncodes) &&
+        ($promotiontoken !== '' || optional_param('promotioncode', '', PARAM_RAW_TRIMMED) !== '')
+    ) {
         throw new moodle_exception('invoicepromotiondisabled', 'paygw_stripe');
     }
     if (!empty($config->invoicepromotioncodes)) {
@@ -67,14 +69,18 @@ if (($config->type ?? '') === 'invoice') {
         $choice = invoice_promotion_choices::read($promotiontoken, $identity);
         if (!$choice) {
             $PAGE->set_context(context_system::instance());
-            $PAGE->set_url(new moodle_url('/payment/gateway/stripe/pay.php',
-                compact('component', 'paymentarea', 'itemid')));
+            $PAGE->set_url(new moodle_url(
+                '/payment/gateway/stripe/pay.php',
+                compact('component', 'paymentarea', 'itemid')
+            ));
             $PAGE->set_pagelayout('standard');
             $PAGE->set_title(get_string('invoicepromotiontitle', 'paygw_stripe'));
             $PAGE->set_heading($description);
             $options = invoice_promotion_request::options($component, $paymentarea, $itemid, '', false);
-            $form = new \paygw_stripe\form\invoice_promotion_form(null,
-                compact('component', 'paymentarea', 'itemid') + ['resume' => $options['resume']]);
+            $form = new \paygw_stripe\form\invoice_promotion_form(
+                null,
+                compact('component', 'paymentarea', 'itemid') + ['resume' => $options['resume']]
+            );
             if ($form->is_cancelled()) {
                 redirect(new moodle_url('/'));
             }
@@ -115,10 +121,16 @@ if (($config->type ?? '') === 'invoice') {
             $promotionselected
         );
     } catch (moodle_exception $e) {
-        if (!empty($config->invoicepromotioncodes) &&
-            in_array($e->errorcode, ['invoicepromotioninvalid', 'invoicepromotionunavailable', 'invoicepromotionlocked'], true)) {
-            redirect(new moodle_url('/payment/gateway/stripe/pay.php', compact('component', 'paymentarea', 'itemid')),
-                $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
+        if (
+            !empty($config->invoicepromotioncodes) &&
+            in_array($e->errorcode, ['invoicepromotioninvalid', 'invoicepromotionunavailable', 'invoicepromotionlocked'], true)
+        ) {
+            redirect(
+                new moodle_url('/payment/gateway/stripe/pay.php', compact('component', 'paymentarea', 'itemid')),
+                $e->getMessage(),
+                null,
+                \core\output\notification::NOTIFY_ERROR
+            );
         }
         throw $e;
     }

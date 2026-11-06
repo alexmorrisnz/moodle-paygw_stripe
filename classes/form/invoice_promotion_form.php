@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace paygw_stripe\form;
 
@@ -41,18 +41,29 @@ final class invoice_promotion_form extends \moodleform {
             $form->setType($name, $type);
         }
         $resume = !empty($this->_customdata['resume']);
-        $form->addElement('static', 'explanation', '',
-            get_string($resume ? 'invoicepromotionresume' : 'invoicepromotionintro', 'paygw_stripe'));
+        $form->addElement(
+            'static',
+            'explanation',
+            '',
+            get_string($resume ? 'invoicepromotionresume' : 'invoicepromotionintro', 'paygw_stripe')
+        );
         $buttons = [];
         if (!$resume) {
-            $form->addElement('text', 'promotioncode', get_string('invoicepromotioncode', 'paygw_stripe'),
-                ['maxlength' => 200, 'autocomplete' => 'off']);
+            $form->addElement(
+                'text',
+                'promotioncode',
+                get_string('invoicepromotioncode', 'paygw_stripe'),
+                ['maxlength' => 200, 'autocomplete' => 'off']
+            );
             $form->setType('promotioncode', PARAM_RAW_TRIMMED);
             $form->addHelpButton('promotioncode', 'invoicepromotioncode', 'paygw_stripe');
             $buttons[] = $form->createElement('submit', 'applycode', get_string('invoicepromotionapply', 'paygw_stripe'));
         }
-        $buttons[] = $form->createElement('submit', 'continuepayment',
-            get_string($resume ? 'invoicepromotioncontinueexisting' : 'invoicepromotioncontinue', 'paygw_stripe'));
+        $buttons[] = $form->createElement(
+            'submit',
+            'continuepayment',
+            get_string($resume ? 'invoicepromotioncontinueexisting' : 'invoicepromotioncontinue', 'paygw_stripe')
+        );
         $buttons[] = $form->createElement('cancel');
         $form->addGroup($buttons, 'buttons', '', ' ', false);
         $form->closeHeaderBefore('buttons');
@@ -67,8 +78,13 @@ final class invoice_promotion_form extends \moodleform {
     public function validation($data, $files): array {
         $errors = parent::validation($data, $files);
         try {
-            $this->selection = invoice_promotion_request::options($this->_customdata['component'],
-                $this->_customdata['paymentarea'], $this->_customdata['itemid'], $data['promotioncode'] ?? '', true);
+            $this->selection = invoice_promotion_request::options(
+                $this->_customdata['component'],
+                $this->_customdata['paymentarea'],
+                $this->_customdata['itemid'],
+                $data['promotioncode'] ?? '',
+                true
+            );
             if (!$this->selection['enabled']) {
                 throw new \moodle_exception('invoicepromotiondisabled', 'paygw_stripe');
             }

@@ -122,8 +122,15 @@ class invoice_service {
             $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
             try {
                 if ($promotioncodeid !== null) {
-                    $this->validate_promotion($promotioncodeid, $amount, $currency, $customer->id,
-                        $component, $paymentarea, $itemid);
+                    $this->validate_promotion(
+                        $promotioncodeid,
+                        $amount,
+                        $currency,
+                        $customer->id,
+                        $component,
+                        $paymentarea,
+                        $itemid
+                    );
                 }
             } catch (\Throwable $e) {
                 (new customer_service($this->stripe))->release_invoice_identity_if_unused($userid, $customer->id);
@@ -228,8 +235,15 @@ class invoice_service {
                     }
                     $selected = $promotionselected ? $promotioncodeid : $record->promotioncodeid;
                     if ($selected !== null) {
-                        $this->validate_promotion($selected, $record->amount, $record->currency, $record->customerid,
-                            $component, $paymentarea, $itemid);
+                        $this->validate_promotion(
+                            $selected,
+                            $record->amount,
+                            $record->currency,
+                            $record->customerid,
+                            $component,
+                            $paymentarea,
+                            $itemid
+                        );
                     }
                     // No invoice exists yet; rotating the continuation never extends the original expiry.
                     $record->promotioncodeid = $selected;
@@ -299,15 +313,29 @@ class invoice_service {
     ): void {
         try {
             $product = $this->pricing->get_product($component, $paymentarea, (string)$itemid) ??
-                $this->pricing->create_product(purchase_description::get($component, $paymentarea, $itemid),
-                    $component, $paymentarea, (string)$itemid);
+                $this->pricing->create_product(
+                    purchase_description::get($component, $paymentarea, $itemid),
+                    $component,
+                    $paymentarea,
+                    (string)$itemid
+                );
             (new invoice_promotion_service($this->stripe))->quote_by_id($id, $amount, $currency, $customerid, $product->id);
         } catch (\Stripe\Exception\InvalidRequestException $e) {
-            throw new \moodle_exception('invoicepromotioninvalid', 'paygw_stripe', '', null,
-                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode());
+            throw new \moodle_exception(
+                'invoicepromotioninvalid',
+                'paygw_stripe',
+                '',
+                null,
+                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+            );
         } catch (\Stripe\Exception\ApiErrorException $e) {
-            throw new \moodle_exception('invoicepromotionunavailable', 'paygw_stripe', '', null,
-                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode());
+            throw new \moodle_exception(
+                'invoicepromotionunavailable',
+                'paygw_stripe',
+                '',
+                null,
+                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+            );
         }
     }
 
@@ -605,9 +633,14 @@ class invoice_service {
                     $record->timeconfirmed = null;
                     $record->timemodified = time();
                     $this->repository->save($record);
-                    throw new \moodle_exception('invoicepromotioninvalid', 'paygw_stripe', '', null,
+                    throw new \moodle_exception(
+                        'invoicepromotioninvalid',
+                        'paygw_stripe',
+                        '',
+                        null,
                         'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode() .
-                        '; parameter: ' . $e->getStripeParam());
+                        '; parameter: ' . $e->getStripeParam()
+                    );
                 }
                 throw $e;
             }

@@ -59,8 +59,14 @@ final class invoice_flow_test extends invoice_testcase {
     private function start_promotion(?string $codeid = 'promo_course'): array {
         $this->service->start_payment(
             (object)['invoicepromotioncodes' => 1, 'enableautomatictax' => 0, 'defaulttaxbehavior' => 'inclusive'],
-            new payable(49.95, 'EUR', $this->accountid), 'ignored', 49.95,
-            'enrol_fee', 'fee', $this->instanceid, $codeid, true
+            new payable(49.95, 'EUR', $this->accountid),
+            'ignored',
+            49.95,
+            'enrol_fee',
+            'fee',
+            $this->instanceid,
+            $codeid,
+            true
         );
         $query = $this->last_portal_query();
         return [(int)$query['request'], $query['token']];
@@ -85,7 +91,9 @@ final class invoice_flow_test extends invoice_testcase {
         $this->seed_promotion();
         $result = \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid, 'KURS20', true);
         $result = \core_external\external_api::clean_returnvalue(
-            \paygw_stripe\external\invoice_promotion::execute_returns(), $result);
+            \paygw_stripe\external\invoice_promotion::execute_returns(),
+            $result
+        );
         $this->assertTrue($result['enabled']);
         $this->assertFalse($result['resume']);
         $this->assertSame('KURS20', $result['code']);
@@ -110,8 +118,10 @@ final class invoice_flow_test extends invoice_testcase {
         $result = \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid);
         $this->assertFalse($result['enabled']);
         $this->assertSame([], $this->http->requests);
-        $this->assert_error('invoiceunavailable',
-            fn() => \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid, 'SAVE', true));
+        $this->assert_error(
+            'invoiceunavailable',
+            fn() => \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid, 'SAVE', true)
+        );
     }
 
     public function test_blank_selection_does_not_consume_code_check_limit(): void {
@@ -123,8 +133,10 @@ final class invoice_flow_test extends invoice_testcase {
         $this->assertNotEmpty($result['token']);
         $this->assertCount(20, $SESSION->paygw_stripe_promotion_attempts);
         $this->assertSame([], $this->http->requests);
-        $this->assert_error('invoicepromotionratelimit',
-            fn() => invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, 'KURS20', true));
+        $this->assert_error(
+            'invoicepromotionratelimit',
+            fn() => invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, 'KURS20', true)
+        );
         $this->assertSame([], $this->http->requests);
     }
 
@@ -134,7 +146,8 @@ final class invoice_flow_test extends invoice_testcase {
         $this->seed_promotion();
         $PAGE->set_url('/payment/gateway/stripe/pay.php');
         \paygw_stripe\form\invoice_promotion_form::mock_submit(
-            $this->promotion_page_params() + ['promotioncode' => ' kurs20 ', 'applycode' => 1]);
+            $this->promotion_page_params() + ['promotioncode' => ' kurs20 ', 'applycode' => 1]
+        );
         $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params());
         $this->assertNotNull($form->get_data());
         $selection = $form->get_selection();
@@ -150,7 +163,8 @@ final class invoice_flow_test extends invoice_testcase {
         $this->enable_promotion_page();
         $PAGE->set_url('/payment/gateway/stripe/pay.php');
         \paygw_stripe\form\invoice_promotion_form::mock_submit(
-            $this->promotion_page_params() + ['promotioncode' => 'INVALID', 'continuepayment' => 1]);
+            $this->promotion_page_params() + ['promotioncode' => 'INVALID', 'continuepayment' => 1]
+        );
         $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params());
         $this->assertNull($form->get_data());
         $this->assertNull($form->get_selection());
@@ -173,7 +187,8 @@ final class invoice_flow_test extends invoice_testcase {
         $this->seed_promotion();
         $_GET = $this->promotion_page_params();
         \paygw_stripe\form\invoice_promotion_form::mock_submit(
-            $this->promotion_page_params() + ['promotioncode' => 'KURS20', 'continuepayment' => 1]);
+            $this->promotion_page_params() + ['promotioncode' => 'KURS20', 'continuepayment' => 1]
+        );
         $this->assert_error('redirecterrordetected', function () use ($CFG): void {
             global $USER, $PAGE, $OUTPUT;
             require($CFG->dirroot . '/payment/gateway/stripe/pay.php');
@@ -200,7 +215,8 @@ final class invoice_flow_test extends invoice_testcase {
         $this->assertStringNotContainsString('name="promotioncode"', $html);
         $this->assertStringContainsString(get_string('invoicepromotioncontinueexisting', 'paygw_stripe'), $html);
         \paygw_stripe\form\invoice_promotion_form::mock_submit(
-            $this->promotion_page_params() + ['continuepayment' => 1]);
+            $this->promotion_page_params() + ['continuepayment' => 1]
+        );
         $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params() + ['resume' => true]);
         $this->assertNotNull($form->get_data());
         $selection = $form->get_selection();

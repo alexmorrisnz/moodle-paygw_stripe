@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 declare(strict_types=1);
 
@@ -42,15 +42,21 @@ final class invoice_promotion_request {
         global $DB;
         require_login(null, false);
         if ($component === 'enrol_fee' && $paymentarea === 'fee') {
-            $instance = $DB->get_record('enrol', ['id' => $itemid, 'enrol' => 'fee', 'status' => ENROL_INSTANCE_ENABLED],
-                '*', MUST_EXIST);
+            $instance = $DB->get_record(
+                'enrol',
+                ['id' => $itemid, 'enrol' => 'fee', 'status' => ENROL_INSTANCE_ENABLED],
+                '*',
+                MUST_EXIST
+            );
             $course = get_course($instance->courseid);
             $context = \context_course::instance($course->id);
             if (!$course->visible && !has_capability('moodle/course:viewhiddencourses', $context)) {
                 throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
             }
-            if (($instance->enrolstartdate && $instance->enrolstartdate > time()) ||
-                ($instance->enrolenddate && $instance->enrolenddate < time())) {
+            if (
+                ($instance->enrolstartdate && $instance->enrolstartdate > time()) ||
+                ($instance->enrolenddate && $instance->enrolenddate < time())
+            ) {
                 throw new \moodle_exception('invoiceunavailable', 'paygw_stripe');
             }
         }
@@ -104,8 +110,13 @@ final class invoice_promotion_request {
         }
         $code = trim($code);
         $existing = (new \paygw_stripe\local\repository\invoice_repository())->find_active_purchase(
-            (int)$USER->id, $identity['paymentaccountid'], $component, $paymentarea, $itemid,
-            $identity['amount'], $identity['currency']
+            (int)$USER->id,
+            $identity['paymentaccountid'],
+            $component,
+            $paymentarea,
+            $itemid,
+            $identity['amount'],
+            $identity['currency']
         );
         if ($existing && $existing->status !== 'billing') {
             $result['resume'] = true;
@@ -140,19 +151,38 @@ final class invoice_promotion_request {
                 $customer = $customers->get_invoice_customer($USER);
                 $pricing = $factory->product_pricing_service();
                 $product = $pricing->get_product($component, $paymentarea, (string)$itemid) ??
-                    $pricing->create_product(purchase_description::get($component, $paymentarea, $itemid),
-                        $component, $paymentarea, (string)$itemid);
-                $quote = $factory->invoice_promotion_service()->quote($code, $amount, $identity['currency'],
-                    $customer->id, $product->id);
+                    $pricing->create_product(
+                        purchase_description::get($component, $paymentarea, $itemid),
+                        $component,
+                        $paymentarea,
+                        (string)$itemid
+                    );
+                $quote = $factory->invoice_promotion_service()->quote(
+                    $code,
+                    $amount,
+                    $identity['currency'],
+                    $customer->id,
+                    $product->id
+                );
                 $promotionid = $quote['promotioncodeid'];
                 $amount = $quote['amount'];
                 $result['code'] = $quote['code'];
             } catch (\Stripe\Exception\InvalidRequestException $e) {
-                throw new \moodle_exception('invoicepromotioninvalid', 'paygw_stripe', '', null,
-                    'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode());
+                throw new \moodle_exception(
+                    'invoicepromotioninvalid',
+                    'paygw_stripe',
+                    '',
+                    null,
+                    'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+                );
             } catch (\Stripe\Exception\ApiErrorException $e) {
-                throw new \moodle_exception('invoicepromotionunavailable', 'paygw_stripe', '', null,
-                    'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode());
+                throw new \moodle_exception(
+                    'invoicepromotionunavailable',
+                    'paygw_stripe',
+                    '',
+                    null,
+                    'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+                );
             } finally {
                 if ($customer) {
                     $customers->release_invoice_identity_if_unused((int)$USER->id, $customer->id);
@@ -160,8 +190,11 @@ final class invoice_promotion_request {
             }
         }
         $factor = in_array(strtoupper($identity['currency']), gateway::get_zero_decimal_currencies(), true) ? 1 : 100;
-        $result['message'] = get_string($promotionid ? 'invoicepromotionestimate' : 'invoicepromotionwithout', 'paygw_stripe',
-            helper::get_cost_as_string($amount / $factor, $payable->get_currency()));
+        $result['message'] = get_string(
+            $promotionid ? 'invoicepromotionestimate' : 'invoicepromotionwithout',
+            'paygw_stripe',
+            helper::get_cost_as_string($amount / $factor, $payable->get_currency())
+        );
         $result['token'] = invoice_promotion_choices::save($identity, $promotionid);
         return $result;
     }

@@ -56,9 +56,11 @@ try {
     $url = $factory->invoice_service()->complete_billing($id, (int)$USER->id, $token);
 } catch (moodle_exception $e) {
     $current = (new invoice_repository())->find_by_id($id);
-    if ($e->errorcode === 'invoicepromotioninvalid' && $current && $current->userid === (int)$USER->id &&
+    if (
+        $e->errorcode === 'invoicepromotioninvalid' && $current && $current->userid === (int)$USER->id &&
         $current->status === 'billing' && !$current->invoiceid && $current->timeexpires >= time() &&
-        hash_equals($current->tokenhash, hash('sha256', $token))) {
+        hash_equals($current->tokenhash, hash('sha256', $token))
+    ) {
         redirect(new moodle_url('/payment/gateway/stripe/pay.php', [
             'component' => $current->component,
             'paymentarea' => $current->paymentarea,

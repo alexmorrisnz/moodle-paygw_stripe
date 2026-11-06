@@ -210,9 +210,11 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 }
                 $response = $this->promotioncodes[$id];
             } else {
-                $response = $this->collection(array_values(array_filter($this->promotioncodes,
+                $response = $this->collection(array_values(array_filter(
+                    $this->promotioncodes,
                     static fn($code) => (!isset($params['code']) || strcasecmp($params['code'], $code['code']) === 0) &&
-                        (!isset($params['active']) || $params['active'] === $code['active']))));
+                    (!isset($params['active']) || $params['active'] === $code['active'])
+                )));
             }
         } else if ($resource === 'coupons') {
             if (!isset($this->coupons[$id])) {
@@ -220,8 +222,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
             }
             $response = $this->coupons[$id];
         } else if ($resource === 'subscriptions' && $method === 'get') {
-            $response = $this->collection(array_values(array_filter($this->subscriptions,
-                static fn($subscription) => $subscription['customer'] === $params['customer'])));
+            $response = $this->collection(array_values(array_filter(
+                $this->subscriptions,
+                static fn($subscription) => $subscription['customer'] === $params['customer']
+            )));
         } else if ($resource === 'invoices') {
             if ($method === 'post' && !$id) {
                 if ($this->invoicecreateerror !== null) {
@@ -231,8 +235,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 }
                 foreach ($params['discounts'] ?? [] as $discount) {
                     $promotion = $this->promotioncodes[$discount['promotion_code']] ?? null;
-                    if (!$promotion || !$promotion['active'] ||
-                        (!empty($promotion['expires_at']) && $promotion['expires_at'] <= time())) {
+                    if (
+                        !$promotion || !$promotion['active'] ||
+                        (!empty($promotion['expires_at']) && $promotion['expires_at'] <= time())
+                    ) {
                         return [json_encode(['error' => ['type' => 'invalid_request_error', 'param' => 'discounts',
                             'message' => 'Promotion code is no longer valid']]), 400, []];
                     }
@@ -247,8 +253,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                     static fn($item) => $item['invoice'] === $id
                 );
                 $total = array_sum(array_column($invoiceitems, 'amount'));
-                $eligible = array_sum(array_column(array_filter($invoiceitems,
-                    static fn($item) => $item['discountable']), 'amount'));
+                $eligible = array_sum(array_column(array_filter(
+                    $invoiceitems,
+                    static fn($item) => $item['discountable']
+                ), 'amount'));
                 foreach ($invoice['discounts'] ?? [] as $discount) {
                     $promotion = $this->promotioncodes[$discount['promotion_code']];
                     $coupon = $this->coupons[$promotion['promotion']['coupon']];
@@ -287,9 +295,11 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                 }
                 $this->sent[] = ['invoiceid' => $id, 'email' => $response['customer_email'], 'key' => $key];
             } else if (!$id && $method === 'get') {
-                $response = $this->collection(array_values(array_filter($this->invoices,
+                $response = $this->collection(array_values(array_filter(
+                    $this->invoices,
                     static fn($invoice) => $invoice['customer'] === $params['customer'] &&
-                        (!isset($params['status']) || $invoice['status'] === $params['status']))));
+                    (!isset($params['status']) || $invoice['status'] === $params['status'])
+                )));
             } else {
                 $response = $this->invoices[$id];
             }
@@ -308,7 +318,9 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
             $response = $this->collection($payments);
         } else if ($resource === 'payment_intents' && $method === 'get') {
             $response = $id ? $this->paymentintents[$id] : $this->collection(array_values(array_filter(
-                $this->paymentintents, static fn($intent) => $intent['customer'] === $params['customer'])));
+                $this->paymentintents,
+                static fn($intent) => $intent['customer'] === $params['customer']
+            )));
         } else if ($resource === 'invoiceitems') {
             $id = 'ii_' . (count($this->items) + 1);
             $response = $this->items[$id] = ['id' => $id, 'object' => 'invoiceitem',

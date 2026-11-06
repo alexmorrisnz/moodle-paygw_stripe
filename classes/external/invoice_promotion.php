@@ -8,11 +8,11 @@
 //
 // Moodle is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle. If not, see <https://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace paygw_stripe\external;
 
@@ -55,13 +55,22 @@ final class invoice_promotion extends external_api {
         $params = self::validate_parameters(self::execute_parameters(), compact('component', 'paymentarea', 'itemid', 'code', 'apply'));
         self::validate_context(\context_system::instance());
         require_login(null, false);
-        if (!$params['apply'] && !in_array('stripe', \core_payment\helper::get_available_gateways(
-            $params['component'], $params['paymentarea'], $params['itemid']
-        ), true)) {
+        if (
+            !$params['apply'] && !in_array('stripe', \core_payment\helper::get_available_gateways(
+                $params['component'],
+                $params['paymentarea'],
+                $params['itemid']
+            ), true)
+        ) {
             return ['enabled' => false, 'resume' => false, 'token' => '', 'code' => '', 'message' => ''];
         }
-        return invoice_promotion_request::options($params['component'], $params['paymentarea'], $params['itemid'],
-            $params['code'], $params['apply']);
+        return invoice_promotion_request::options(
+            $params['component'],
+            $params['paymentarea'],
+            $params['itemid'],
+            $params['code'],
+            $params['apply']
+        );
     }
 
     /** @return external_single_structure Editor response. */
