@@ -1,0 +1,21 @@
+{{!
+    @template paygw_stripe/invoice_promotion
+    Optional invoice code editor. Example context: {"inputid":"stripe-invoice-code-1","resume":false}
+}}
+<section class="border rounded p-3 mt-3" data-region="stripe-invoice-promotion" hidden>
+    {{#resume}}
+        <p class="mb-0">{{#str}} invoicepromotionresume, paygw_stripe {{/str}}</p>
+    {{/resume}}
+    {{^resume}}
+        <label for="{{inputid}}">{{#str}} invoicepromotioncode, paygw_stripe {{/str}}</label>
+        <div class="input-group">
+            <input type="text" class="form-control" id="{{inputid}}" maxlength="200" autocomplete="off"
+                   aria-describedby="{{inputid}}-hint {{inputid}}-status">
+            <button type="button" class="btn btn-secondary">{{#str}} invoicepromotionapply, paygw_stripe {{/str}}</button>
+        </div>
+        <p class="small text-muted mt-2 mb-0" id="{{inputid}}-hint">
+            {{#str}} invoicepromotioncode_help, paygw_stripe {{/str}}
+        </p>
+    {{/resume}}
+    <p class="mt-2 mb-0" id="{{inputid}}-status" role="status" aria-live="polite" data-region="promotion-status"></p>
+</section>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="payment/gateway/stripe/db" VERSION="20261027" COMMENT="XMLDB file for Stripe payment gateway plugin"
+<XMLDB PATH="payment/gateway/stripe/db" VERSION="20261029" COMMENT="XMLDB file for Stripe payment gateway plugin"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
@@ -110,6 +110,7 @@
         <FIELD NAME="banktransfercountry" TYPE="char" LENGTH="2" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="paymentmethodstatus" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="legacy" SEQUENCE="false"/>
         <FIELD NAME="paymentmethods" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="promotioncodeid" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>

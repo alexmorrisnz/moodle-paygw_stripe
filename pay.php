@@ -24,11 +24,15 @@
 
 use core_payment\helper;
 use paygw_stripe\local\service\purchase_description;
+use paygw_stripe\local\service\invoice_promotion_choices;
+use paygw_stripe\local\service\invoice_promotion_request;
 use paygw_stripe\local\service\stripe_service_factory;
 use paygw_stripe\stripe_helper;
 
 require_once(__DIR__ . '/../../../config.php');
 require_once(__DIR__ . '/.extlib/stripe-php/init.php');
+
+global $PAGE, $OUTPUT;
 
 require_login();
 
@@ -46,15 +50,78 @@ $cost = helper::get_rounded_cost($payable->get_amount(), $payable->get_currency(
 
 $factory = new stripe_service_factory($config->apikey, $config->secretkey);
 if (($config->type ?? '') === 'invoice') {
-    $url = $factory->invoice_service()->start_payment(
-        $config,
-        $payable,
-        $description,
-        $cost,
-        $component,
-        $paymentarea,
-        $itemid
-    );
+    if (!CLI_SCRIPT) {
+        header('Cache-Control: no-store');
+        header('Referrer-Policy: no-referrer');
+    }
+    $promotioncodeid = null;
+    $promotionselected = false;
+    $promotiontoken = optional_param('promotionchoice', '', PARAM_ALPHANUM);
+    if (empty($config->invoicepromotioncodes) &&
+        ($promotiontoken !== '' || optional_param('promotioncode', '', PARAM_RAW_TRIMMED) !== '')) {
+        throw new moodle_exception('invoicepromotiondisabled', 'paygw_stripe');
+    }
+    if (!empty($config->invoicepromotioncodes)) {
+        // No invoice or Portal session is created until the purchaser makes an explicit choice.
+        [$config, $payable, $cost, $identity] = invoice_promotion_request::purchase($component, $paymentarea, $itemid);
+        $choice = invoice_promotion_choices::read($promotiontoken, $identity);
+        if (!$choice) {
+            $PAGE->set_context(context_system::instance());
+            $PAGE->set_url(new moodle_url('/payment/gateway/stripe/pay.php',
+                compact('component', 'paymentarea', 'itemid')));
+            $PAGE->set_pagelayout('standard');
+            $PAGE->set_title(get_string('invoicepromotiontitle', 'paygw_stripe'));
+            $PAGE->set_heading($description);
+            $options = invoice_promotion_request::options($component, $paymentarea, $itemid, '', false);
+            $form = new \paygw_stripe\form\invoice_promotion_form(null,
+                compact('component', 'paymentarea', 'itemid') + ['resume' => $options['resume']]);
+            if ($form->is_cancelled()) {
+                redirect(new moodle_url('/'));
+            }
+            $selection = null;
+            if ($data = $form->get_data()) {
+                $selection = $form->get_selection();
+                if (!empty($data->continuepayment) && $selection) {
+                    $choice = invoice_promotion_choices::read($selection['token'], $identity);
+                }
+            }
+            if (!$choice) {
+                echo $OUTPUT->header();
+                echo $OUTPUT->heading(get_string('invoicepromotiontitle', 'paygw_stripe'));
+                if ($promotiontoken !== '') {
+                    echo $OUTPUT->notification(get_string('invoicepromotionexpired', 'paygw_stripe'), 'warning');
+                }
+                if ($selection) {
+                    echo $OUTPUT->notification($selection['message'], 'success');
+                }
+                $form->display();
+                echo $OUTPUT->footer();
+                exit;
+            }
+        }
+        $promotioncodeid = $choice['promotioncodeid'];
+        $promotionselected = true;
+    }
+    try {
+        $url = $factory->invoice_service()->start_payment(
+            $config,
+            $payable,
+            $description,
+            $cost,
+            $component,
+            $paymentarea,
+            $itemid,
+            $promotioncodeid,
+            $promotionselected
+        );
+    } catch (moodle_exception $e) {
+        if (!empty($config->invoicepromotioncodes) &&
+            in_array($e->errorcode, ['invoicepromotioninvalid', 'invoicepromotionunavailable', 'invoicepromotionlocked'], true)) {
+            redirect(new moodle_url('/payment/gateway/stripe/pay.php', compact('component', 'paymentarea', 'itemid')),
+                $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
+        }
+        throw $e;
+    }
     redirect($url);
 }
 

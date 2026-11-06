@@ -157,6 +157,11 @@ class gateway extends \core_payment\gateway {
         $mform->hideIf('collectbillingaddress', 'type', 'eq', 'invoice');
         $mform->hideIf('paymentmethodconfiguration', 'type', 'eq', 'invoice');
 
+        $mform->addElement('advcheckbox', 'invoicepromotioncodes', get_string('invoicepromotioncodes', 'paygw_stripe'));
+        $mform->setDefault('invoicepromotioncodes', false);
+        $mform->addHelpButton('invoicepromotioncodes', 'invoicepromotioncodes', 'paygw_stripe');
+        $mform->hideIf('invoicepromotioncodes', 'type', 'neq', 'invoice');
+
         $bankcountries = [];
         foreach (invoice_service::EU_BANK_TRANSFER_COUNTRIES as $country) {
             $bankcountries[$country] = get_string($country, 'countries');

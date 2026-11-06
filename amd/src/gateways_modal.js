@@ -23,6 +23,7 @@
 
 import Templates from 'core/templates';
 import Modal from 'core/modal';
+import {preparePayment} from './invoice_promotions';
 
 let paymentInProgress = false;
 
@@ -37,22 +38,23 @@ const showModalWithPlaceholder = async() => {
     modal.show();
 };
 
-export const process = (component, paymentArea, itemId, description) => {
+export const process = (component, paymentArea, itemId) => {
     if (paymentInProgress) {
         return new Promise(() => null);
     }
     paymentInProgress = true;
-    return showModalWithPlaceholder()
-        .then(() => {
-            location.href = M.cfg.wwwroot + '/payment/gateway/stripe/pay.php?' +
-                'component=' + component +
-                '&paymentarea=' + paymentArea +
-                '&itemid=' + itemId +
-                '&description=' + description;
+    return preparePayment(component, paymentArea, itemId)
+        .then(token => showModalWithPlaceholder().then(() => token))
+        .then(token => {
+            const query = new URLSearchParams({component, paymentarea: paymentArea, itemid: itemId});
+            if (token) {
+                query.set('promotionchoice', token);
+            }
+            location.href = M.cfg.wwwroot + '/payment/gateway/stripe/pay.php?' + query.toString();
             return new Promise(() => null);
         })
         .catch(error => {
             paymentInProgress = false;
-            throw error;
+            throw error.message || error;
         });
 };

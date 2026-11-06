@@ -40,6 +40,302 @@ require_once(__DIR__ . '/../../fixtures/invoice_testcase.php');
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class invoice_flow_test extends invoice_testcase {
+    /** Seed a promotion understood by the pinned Stripe SDK. */
+    private function seed_promotion(): void {
+        $this->http->promotioncodes['promo_course'] = [
+            'id' => 'promo_course', 'object' => 'promotion_code', 'code' => 'KURS20', 'active' => true,
+            'promotion' => ['type' => 'coupon', 'coupon' => 'coupon_course'], 'customer' => null,
+            'customer_account' => null, 'expires_at' => null, 'max_redemptions' => null, 'times_redeemed' => 0,
+            'restrictions' => ['first_time_transaction' => false, 'minimum_amount' => null],
+        ];
+        $this->http->coupons['coupon_course'] = [
+            'id' => 'coupon_course', 'object' => 'coupon', 'valid' => true, 'percent_off' => 20,
+            'currency' => null, 'currency_options' => null, 'amount_off' => null, 'applies_to' => null,
+            'redeem_by' => null, 'max_redemptions' => null, 'times_redeemed' => 0,
+        ];
+    }
+
+    /** Start an explicitly selected promotion purchase. */
+    private function start_promotion(?string $codeid = 'promo_course'): array {
+        $this->service->start_payment(
+            (object)['invoicepromotioncodes' => 1, 'enableautomatictax' => 0, 'defaulttaxbehavior' => 'inclusive'],
+            new payable(49.95, 'EUR', $this->accountid), 'ignored', 49.95,
+            'enrol_fee', 'fee', $this->instanceid, $codeid, true
+        );
+        $query = $this->last_portal_query();
+        return [(int)$query['request'], $query['token']];
+    }
+
+    /** Enable the invoice code-entry page for request and form tests. */
+    private function enable_promotion_page(): void {
+        global $DB;
+        $DB->set_field('payment_gateways', 'config', json_encode([
+            'apikey' => 'pk_test_fake', 'secretkey' => 'sk_test_fake', 'type' => 'invoice',
+            'invoicepromotioncodes' => 1, 'enableautomatictax' => 0, 'defaulttaxbehavior' => 'inclusive',
+        ]), ['accountid' => $this->accountid, 'gateway' => 'stripe']);
+    }
+
+    /** @return array Parameters for the invoice code-entry page. */
+    private function promotion_page_params(): array {
+        return ['component' => 'enrol_fee', 'paymentarea' => 'fee', 'itemid' => $this->instanceid];
+    }
+
+    public function test_popup_endpoint_returns_purchase_bound_selection(): void {
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        $result = \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid, 'KURS20', true);
+        $result = \core_external\external_api::clean_returnvalue(
+            \paygw_stripe\external\invoice_promotion::execute_returns(), $result);
+        $this->assertTrue($result['enabled']);
+        $this->assertFalse($result['resume']);
+        $this->assertSame('KURS20', $result['code']);
+        $identity = invoice_promotion_request::purchase('enrol_fee', 'fee', $this->instanceid)[3];
+        $choice = invoice_promotion_choices::read($result['token'], $identity);
+        $this->assertSame('promo_course', $choice['promotioncodeid']);
+        $identity['itemid']++;
+        $this->assertNull(invoice_promotion_choices::read($result['token'], $identity));
+        $this->assertSame([], $this->http->sessions);
+    }
+
+    public function test_popup_endpoint_reports_disabled_invoice_codes_without_stripe_requests(): void {
+        $result = \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid);
+        $this->assertFalse($result['enabled']);
+        $this->assertSame('', $result['token']);
+        $this->assertSame([], $this->http->requests);
+    }
+
+    public function test_popup_options_ignore_purchases_without_stripe_gateway(): void {
+        global $DB;
+        $DB->set_field('payment_gateways', 'enabled', 0, ['accountid' => $this->accountid, 'gateway' => 'stripe']);
+        $result = \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid);
+        $this->assertFalse($result['enabled']);
+        $this->assertSame([], $this->http->requests);
+        $this->assert_error('invoiceunavailable',
+            fn() => \paygw_stripe\external\invoice_promotion::execute('enrol_fee', 'fee', $this->instanceid, 'SAVE', true));
+    }
+
+    public function test_blank_selection_does_not_consume_code_check_limit(): void {
+        global $SESSION;
+        $this->enable_promotion_page();
+        $SESSION->paygw_stripe_promotion_attempts = array_fill(0, 20, time());
+        $result = invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, '', true);
+        $this->assertTrue($result['enabled']);
+        $this->assertNotEmpty($result['token']);
+        $this->assertCount(20, $SESSION->paygw_stripe_promotion_attempts);
+        $this->assertSame([], $this->http->requests);
+        $this->assert_error('invoicepromotionratelimit',
+            fn() => invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, 'KURS20', true));
+        $this->assertSame([], $this->http->requests);
+    }
+
+    public function test_promotion_form_validates_code_without_creating_billing_request(): void {
+        global $PAGE, $DB;
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        $PAGE->set_url('/payment/gateway/stripe/pay.php');
+        \paygw_stripe\form\invoice_promotion_form::mock_submit(
+            $this->promotion_page_params() + ['promotioncode' => ' kurs20 ', 'applycode' => 1]);
+        $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params());
+        $this->assertNotNull($form->get_data());
+        $selection = $form->get_selection();
+        $this->assertSame('KURS20', $selection['code']);
+        $this->assertNotEmpty($selection['token']);
+        $this->assertSame([], $this->http->sessions);
+        $this->assertSame([], $this->http->invoices);
+        $this->assertSame(0, $DB->count_records('paygw_stripe_invoices'));
+    }
+
+    public function test_promotion_form_rejects_invalid_code_and_invalid_sesskey(): void {
+        global $PAGE, $DB;
+        $this->enable_promotion_page();
+        $PAGE->set_url('/payment/gateway/stripe/pay.php');
+        \paygw_stripe\form\invoice_promotion_form::mock_submit(
+            $this->promotion_page_params() + ['promotioncode' => 'INVALID', 'continuepayment' => 1]);
+        $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params());
+        $this->assertNull($form->get_data());
+        $this->assertNull($form->get_selection());
+        $this->assertStringContainsString(get_string('invoicepromotioninvalid', 'paygw_stripe'), $form->render());
+        $this->assertSame([], $this->http->sessions);
+        $this->assertSame(0, $DB->count_records('paygw_stripe_invoices'));
+
+        $_POST['sesskey'] = 'invalid';
+        $before = count($this->http->requests);
+        $this->assert_error('invalidsesskey', function (): void {
+            $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params());
+            $form->get_data();
+        });
+        $this->assertCount($before, $this->http->requests);
+    }
+
+    public function test_direct_payment_post_uses_the_same_code_selection(): void {
+        global $CFG;
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        $_GET = $this->promotion_page_params();
+        \paygw_stripe\form\invoice_promotion_form::mock_submit(
+            $this->promotion_page_params() + ['promotioncode' => 'KURS20', 'continuepayment' => 1]);
+        $this->assert_error('redirecterrordetected', function () use ($CFG): void {
+            global $USER, $PAGE, $OUTPUT;
+            require($CFG->dirroot . '/payment/gateway/stripe/pay.php');
+        });
+        $record = $this->repository->find_by_id((int)$this->last_portal_query()['request']);
+        $this->assertSame('promo_course', $record->promotioncodeid);
+        $this->assertSame([], $this->http->invoices);
+    }
+
+    public function test_existing_invoice_page_shows_resume_action_without_code_editor(): void {
+        global $PAGE;
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $this->complete($id, $token);
+        $this->http->promotioncodes['promo_course']['active'] = false;
+        $before = count($this->http->requests);
+        $options = invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, '', false);
+        $this->assertTrue($options['resume']);
+        $this->assertSame('', $options['token']);
+        $PAGE->set_url('/payment/gateway/stripe/pay.php');
+        $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params() + ['resume' => true]);
+        $html = $form->render();
+        $this->assertStringNotContainsString('name="promotioncode"', $html);
+        $this->assertStringContainsString(get_string('invoicepromotioncontinueexisting', 'paygw_stripe'), $html);
+        \paygw_stripe\form\invoice_promotion_form::mock_submit(
+            $this->promotion_page_params() + ['continuepayment' => 1]);
+        $form = new \paygw_stripe\form\invoice_promotion_form(null, $this->promotion_page_params() + ['resume' => true]);
+        $this->assertNotNull($form->get_data());
+        $selection = $form->get_selection();
+        $identity = invoice_promotion_request::purchase('enrol_fee', 'fee', $this->instanceid)[3];
+        $this->assertSame('promo_course', invoice_promotion_choices::read($selection['token'], $identity)['promotioncodeid']);
+        $this->assertCount($before, $this->http->requests);
+    }
+
+    public function test_confirmed_discount_rejection_returns_to_code_entry_and_can_remove_code(): void {
+        global $CFG;
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $expiry = $this->repository->find_by_id($id)->timeexpires;
+        $this->billing_details($id);
+        $this->http->invoicecreateerror = [
+            'type' => 'invalid_request_error', 'code' => 'coupon_expired', 'message' => 'Coupon has expired',
+        ];
+        $_GET = ['request' => $id, 'token' => $token];
+        $_POST = [];
+        $this->assert_error('redirecterrordetected', function () use ($CFG): void {
+            global $USER;
+            require($CFG->dirroot . '/payment/gateway/stripe/invoice.php');
+        });
+        $this->assertSame('billing', $this->repository->find_by_id($id)->status);
+        $this->assertSame([], $this->http->invoices);
+        [$sameid, $newtoken] = $this->start_promotion(null);
+        $this->assertSame($id, $sameid);
+        $this->assertNotSame($token, $newtoken);
+        $this->assertSame($expiry, $this->repository->find_by_id($id)->timeexpires);
+        $this->assert_error('invalidinvoicecontinuation', fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $invoiceid = $this->complete($id, $newtoken);
+        $this->assertSame([], $this->http->invoices[$invoiceid]['discounts']);
+    }
+
+    public function test_programming_error_does_not_unlock_discount_selection(): void {
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $this->billing_details($id);
+        $this->http->invoicecreateerror = [
+            'type' => 'invalid_request_error', 'code' => 'parameter_unknown',
+            'param' => 'discounts[0][promotion_code]', 'message' => 'Unknown parameter',
+        ];
+        try {
+            $this->service->complete_billing($id, $this->userid, $token);
+            $this->fail('Expected a programming error');
+        } catch (\Stripe\Exception\InvalidRequestException $e) {
+            $this->assertSame('parameter_unknown', $e->getStripeCode());
+        }
+        $this->assertSame('creating', $this->repository->find_by_id($id)->status);
+        $this->assert_error('invoicepromotionlocked', fn() => $this->start_promotion(null));
+    }
+
+    public function test_lost_discounted_invoice_response_resumes_without_revalidating_expired_code(): void {
+        $this->enable_promotion_page();
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $this->billing_details($id);
+        $this->http->lose = '/v1/invoices';
+        try {
+            $this->service->complete_billing($id, $this->userid, $token);
+            $this->fail('Expected a lost response');
+        } catch (\Stripe\Exception\ApiConnectionException $e) {
+            $this->assertSame('creating', $this->repository->find_by_id($id)->status);
+        }
+        $this->http->promotioncodes['promo_course']['active'] = false;
+        $selection = invoice_promotion_request::options('enrol_fee', 'fee', $this->instanceid, '', true);
+        $identity = invoice_promotion_request::purchase('enrol_fee', 'fee', $this->instanceid)[3];
+        $choice = invoice_promotion_choices::read($selection['token'], $identity);
+        $this->assertTrue($selection['resume']);
+        $this->assertSame('promo_course', $choice['promotioncodeid']);
+        $this->start_promotion($choice['promotioncodeid']);
+        $this->assertCount(1, $this->http->invoices);
+        $this->assertSame(3996, $this->repository->find_by_id($id)->amounttotal);
+        $this->assertSame(hash('sha256', $token), $this->repository->find_by_id($id)->tokenhash);
+    }
+
+    public function test_promotion_is_applied_to_the_invoice_and_discounted_payment_is_delivered_once(): void {
+        global $DB;
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $this->assertSame([], $this->http->invoices);
+        $invoiceid = $this->complete($id, $token);
+        $this->assertSame([['promotion_code' => 'promo_course']], $this->http->invoices[$invoiceid]['discounts']);
+        $this->assertTrue(reset($this->http->items)['discountable']);
+        $this->assertSame(3996, $this->repository->find_by_id($id)->amounttotal);
+        $this->assertFalse($this->repository->find_by_id($id)->delivered);
+        $this->http->paid($invoiceid);
+        $this->assertTrue($this->service->process_event($this->event($invoiceid)));
+        $record = $this->repository->find_by_id($id);
+        $this->assertTrue($record->delivered);
+        $this->assertSame(39.96, (float)$DB->get_field('payments', 'amount', ['id' => $record->paymentid]));
+        $before = $DB->count_records('payments');
+        $this->assertTrue($this->service->process_event($this->event($invoiceid)));
+        $this->assertSame($before, $DB->count_records('payments'));
+    }
+
+    public function test_promotion_can_change_only_before_invoice_creation_and_old_tokens_are_invalidated(): void {
+        $this->seed_promotion();
+        [$id, $oldtoken] = $this->start_promotion(null);
+        $expiry = $this->repository->find_by_id($id)->timeexpires;
+        [$sameid, $token] = $this->start_promotion();
+        $this->assertSame($id, $sameid);
+        $this->assertSame($expiry, $this->repository->find_by_id($id)->timeexpires);
+        $this->assert_error('invalidinvoicecontinuation', fn() => $this->service->complete_billing($id, $this->userid, $oldtoken));
+        $this->complete($id, $token);
+        $this->assert_error('invoicepromotionlocked', fn() => $this->start_promotion(null));
+        $this->http->promotioncodes['promo_course']['active'] = false;
+        // Existing invoices can still be resumed after the original code expires.
+        $this->start_promotion();
+        $this->assertCount(1, $this->http->invoices);
+    }
+
+    public function test_code_expiring_during_billing_never_creates_a_full_price_invoice(): void {
+        $this->seed_promotion();
+        [$id, $token] = $this->start_promotion();
+        $this->billing_details($id);
+        $this->http->promotioncodes['promo_course']['expires_at'] = time() - 1;
+        $this->assert_error('invoicepromotioninvalid', fn() => $this->service->complete_billing($id, $this->userid, $token));
+        $this->assertSame([], $this->http->invoices);
+        $this->assertSame([], $this->http->sent);
+        $this->assertSame('billing', $this->repository->find_by_id($id)->status);
+    }
+
+    public function test_full_discount_still_requires_the_paid_webhook(): void {
+        $this->seed_promotion();
+        $this->http->coupons['coupon_course']['percent_off'] = 100;
+        [$id, $token] = $this->start_promotion();
+        $invoiceid = $this->complete($id, $token);
+        $this->assertSame(0, $this->repository->find_by_id($id)->amounttotal);
+        $this->assertFalse($this->repository->find_by_id($id)->delivered);
+        $this->assertTrue($this->service->process_event($this->event($invoiceid)));
+        $this->assertTrue($this->repository->find_by_id($id)->delivered);
+    }
+
     /**
      * The browser endpoint ignores a forged description and does not require that parameter.
      */
