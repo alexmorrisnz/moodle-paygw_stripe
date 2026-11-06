@@ -98,18 +98,18 @@ const mount = async(state) => {
     Templates.appendNodeContents(state.root, html, js);
     state.editor = state.root.querySelector('[data-region="stripe-invoice-promotion"]');
     const visibility = () => {
+        if (!state.root.isConnected) {
+            window.clearInterval(timer);
+            state.root.removeEventListener('change', visibility);
+            if (purchases.get(keyFor(state.args)) === state) {
+                purchases.delete(keyFor(state.args));
+            }
+            return;
+        }
         state.editor.hidden = state.root.querySelector('input[type="radio"]:checked')?.value !== 'stripe';
     };
-    // The modal body arrives before its gateway radios; stop observing once they arrive.
-    if (!state.root.querySelector('input[type="radio"]')) {
-        const observer = new MutationObserver(() => {
-            visibility();
-            if (state.root.querySelector('input[type="radio"]')) {
-                observer.disconnect();
-            }
-        });
-        observer.observe(state.root, {childList: true, subtree: true});
-    }
+    // Setting radio.checked programmatically emits neither a change event nor a DOM mutation.
+    const timer = window.setInterval(visibility, 200);
     state.root.addEventListener('change', visibility);
     visibility();
     state.editor.querySelector('input')?.addEventListener('input', () => message(state, ''));
