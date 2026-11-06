@@ -29,7 +29,7 @@ const selector = '.core_payment_gateways_modal';
 const purchases = new Map();
 const keyFor = args => JSON.stringify([args.component, args.paymentarea, String(args.itemid)]);
 let initialized = false;
-let stopDiscovery = () => {};
+let stopDiscovery = () => null;
 let sequence = 0;
 
 const request = (state, code = '', apply = false) => Ajax.call([{

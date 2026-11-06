@@ -1,8 +1,14 @@
 {{!
     @template paygw_stripe/invoice_promotion
-    Optional invoice code editor. Example context: {"inputid":"stripe-invoice-code-1","resume":false}
+    Optional invoice code editor.
+
+    Example context (json):
+    {
+        "inputid": "stripe-invoice-code-1",
+        "resume": false
+    }
 }}
-<section class="border rounded p-3 mt-3" data-region="stripe-invoice-promotion" hidden>
+<div class="border rounded p-3 mt-3" data-region="stripe-invoice-promotion" hidden>
     {{#resume}}
         <p class="mb-0">{{#str}} invoicepromotionresume, paygw_stripe {{/str}}</p>
     {{/resume}}
@@ -18,4 +24,4 @@
         </p>
     {{/resume}}
     <p class="mt-2 mb-0" id="{{inputid}}-status" role="status" aria-live="polite" data-region="promotion-status"></p>
-</section>
+</div>
