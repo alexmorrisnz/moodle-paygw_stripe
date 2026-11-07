@@ -29,7 +29,8 @@ const selector = '.core_payment_gateways_modal';
 const purchases = new Map();
 const keyFor = args => JSON.stringify([args.component, args.paymentarea, String(args.itemid)]);
 let initialized = false;
-let stopDiscovery = () => null;
+let discovering = false;
+let discoveryTimedOut = false;
 let sequence = 0;
 
 const request = (state, code = '', apply = false) => Ajax.call([{
@@ -137,7 +138,16 @@ export const init = () => {
         if (!trigger) {
             return;
         }
-        stopDiscovery();
+        if (discovering || Array.from(document.querySelectorAll(selector)).some(root => root.isConnected)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
+        // After a timeout, a late modal cannot be safely associated with another trigger.
+        if (discoveryTimedOut) {
+            return;
+        }
+        discovering = true;
         const args = {
             component: trigger.dataset.component,
             paymentarea: trigger.dataset.paymentarea,
@@ -147,7 +157,9 @@ export const init = () => {
         const observer = new MutationObserver(() => {
             const root = Array.from(document.querySelectorAll(selector)).find(node => !existing.has(node));
             if (root) {
-                stopDiscovery();
+                observer.disconnect();
+                window.clearTimeout(timeout);
+                discovering = false;
                 const state = {args, root, editor: null, pending: null};
                 purchases.set(keyFor(args), state);
                 state.ready = mount(state).catch(error => {
@@ -156,11 +168,11 @@ export const init = () => {
                 });
             }
         });
-        const timeout = window.setTimeout(() => observer.disconnect(), 10000);
-        stopDiscovery = () => {
+        const timeout = window.setTimeout(() => {
             observer.disconnect();
-            window.clearTimeout(timeout);
-        };
+            discovering = false;
+            discoveryTimedOut = true;
+        }, 10000);
         observer.observe(document.body, {childList: true, subtree: true});
     }, true);
 };

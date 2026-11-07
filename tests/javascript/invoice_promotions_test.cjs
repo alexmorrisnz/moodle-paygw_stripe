@@ -59,11 +59,16 @@ function fixture(handler) {
     const errors = [];
     const events = {};
     const timers = new Map();
+    const timeouts = new Map();
     let timerId = 0;
     const module = {};
     const context = {
         window: {
-            setTimeout, clearTimeout,
+            setTimeout: callback => {
+                timeouts.set(++timerId, callback);
+                return timerId;
+            },
+            clearTimeout: id => timeouts.delete(id),
             setInterval: callback => {
                 timers.set(++timerId, callback);
                 return timerId;
@@ -111,9 +116,28 @@ function fixture(handler) {
     return {
         module, calls, errors, observers, timers,
         tick: () => Array.from(timers.values()).forEach(callback => callback()),
-        async open(itemid = 1, selected = 'stripe') {
+        expireDiscovery: () => {
+            const callbacks = Array.from(timeouts.values());
+            timeouts.clear();
+            callbacks.forEach(callback => callback());
+        },
+        click(itemid = 1) {
             const dataset = {component: 'enrol_fee', paymentarea: 'fee', itemid: String(itemid)};
-            events.click({target: {closest: () => ({dataset})}});
+            const event = {
+                target: {closest: () => ({dataset})},
+                prevented: false,
+                stopped: false,
+                preventDefault() {
+                    this.prevented = true;
+                },
+                stopImmediatePropagation() {
+                    this.stopped = true;
+                },
+            };
+            events.click(event);
+            return event;
+        },
+        async insertModal(selected = 'stripe') {
             const root = new Element();
             root.selected = selected;
             root.querySelector = selector => selector.includes('radio') ?
@@ -123,11 +147,45 @@ function fixture(handler) {
             await flush();
             return root;
         },
+        async open(itemid = 1, selected = 'stripe') {
+            const event = this.click(itemid);
+            assert.equal(event.stopped, false);
+            return this.insertModal(selected);
+        },
     };
 }
 
 const options = {enabled: true, resume: false};
 const selection = {enabled: true, code: 'SAVE', token: 'opaque', message: 'Discount applied'};
+
+test('blocks overlapping purchases before discovery and while the first popup is open', async() => {
+    const f = fixture(args => args.apply ? {...selection, token: String(args.itemid)} : options);
+    assert.equal(f.click(24).stopped, false);
+    const overlapping = f.click(25);
+    assert.equal(overlapping.prevented, true);
+    assert.equal(overlapping.stopped, true);
+    const first = await f.insertModal();
+    assert.equal(f.calls[0].itemid, 24);
+    assert.equal(f.click(25).stopped, true);
+    assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 24), '24');
+    assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 25), '');
+    first.isConnected = false;
+    first.editor.isConnected = false;
+    const second = await f.open(25);
+    assert.equal(second.input.value, '');
+    assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 25), '25');
+});
+
+test('discovery timeout permits fallback without binding late modals to later purchases', async() => {
+    const f = fixture(() => options);
+    f.click(24);
+    f.expireDiscovery();
+    assert.equal(f.click(25).stopped, false);
+    await f.insertModal();
+    assert.equal(f.calls.length, 0);
+    assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 24), '');
+    assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 25), '');
+});
 
 test('shows only for Stripe and disconnects modal discovery', async() => {
     const f = fixture(() => options);
@@ -232,6 +290,8 @@ test('reopened popups and different purchases never share input', async() => {
     const second = await f.open(2);
     assert.equal(second.input.value, '');
     assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 2), '2');
+    second.isConnected = false;
+    second.editor.isConnected = false;
     const reopened = await f.open(1);
     assert.equal(reopened.input.value, '');
     assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 1), '1');
