@@ -297,12 +297,27 @@ test('reopened popups and different purchases never share input', async() => {
     assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 1), '1');
 });
 
-test('existing invoices show resume details without an editable code', async() => {
-    const f = fixture(args => args.apply ? {...selection, code: ''} : {enabled: true, resume: true});
+test('existing invoices continue without duplicating the static resume explanation', async() => {
+    const f = fixture(args => args.apply ?
+        {...selection, resume: true, code: '', message: 'Continue with the existing invoice'} :
+        {enabled: true, resume: true});
     const root = await f.open();
     assert.equal(root.input, null);
     assert.equal(await f.module.preparePayment('enrol_fee', 'fee', 1), 'opaque');
+    assert.equal(root.status.textContent, '');
     assert.equal(f.calls.at(-1).code, '');
+});
+
+test('existing invoice continuation errors remain visible', async() => {
+    const f = fixture(args => {
+        if (args.apply) {
+            throw new Error('Service unavailable');
+        }
+        return {enabled: true, resume: true};
+    });
+    const root = await f.open();
+    await assert.rejects(f.module.preparePayment('enrol_fee', 'fee', 1), /Service unavailable/);
+    assert.equal(root.status.textContent, 'Service unavailable');
 });
 
 test('disabled feature and failed options use fallback, with failures reported', async() => {
