@@ -69,7 +69,7 @@ const applyCode = state => {
             if (input) {
                 input.value = result.code;
             }
-            message(state, result.message);
+            message(state, result.resume ? '' : result.message);
             return result.token;
         } catch (error) {
             message(state, error.message || String(error), true);
