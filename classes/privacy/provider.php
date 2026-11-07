@@ -75,6 +75,7 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
                 'banktransfercountry' => 'privacy:metadata:stripe_invoices:banktransfercountry',
                 'paymentmethodstatus' => 'privacy:metadata:stripe_invoices:paymentmethodstatus',
                 'paymentmethods' => 'privacy:metadata:stripe_invoices:paymentmethods',
+                'promotioncodeid' => 'privacy:metadata:stripe_invoices:promotioncodeid',
             ],
             'privacy:metadata:stripe_invoices'
         );

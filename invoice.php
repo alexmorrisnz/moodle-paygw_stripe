@@ -26,8 +26,12 @@ use paygw_stripe\local\repository\invoice_repository;
 use paygw_stripe\local\service\stripe_service_factory;
 
 require_once(__DIR__ . '/../../../config.php');
-header('Cache-Control: no-store');
-header('Referrer-Policy: no-referrer');
+global $USER;
+
+if (!CLI_SCRIPT) {
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+}
 require_login();
 
 $id = required_param('request', PARAM_INT);
@@ -48,5 +52,21 @@ if (!$gateway) {
 }
 $config = $gateway->get_configuration();
 $factory = new stripe_service_factory($config['apikey'], $config['secretkey']);
-$url = $factory->invoice_service()->complete_billing($id, (int)$USER->id, $token);
+try {
+    $url = $factory->invoice_service()->complete_billing($id, (int)$USER->id, $token);
+} catch (moodle_exception $e) {
+    $current = (new invoice_repository())->find_by_id($id);
+    if (
+        $e->errorcode === 'invoicepromotioninvalid' && $current && $current->userid === (int)$USER->id &&
+        $current->status === 'billing' && !$current->invoiceid && $current->timeexpires >= time() &&
+        hash_equals($current->tokenhash, hash('sha256', $token))
+    ) {
+        redirect(new moodle_url('/payment/gateway/stripe/pay.php', [
+            'component' => $current->component,
+            'paymentarea' => $current->paymentarea,
+            'itemid' => $current->itemid,
+        ]), $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
+    }
+    throw $e;
+}
 redirect($url);

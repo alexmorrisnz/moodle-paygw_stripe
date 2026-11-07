@@ -96,6 +96,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpunit --fail-on-warning
 
+      - name: Invoice popup JavaScript tests
+        if: ${{ !cancelled() }}
+        run: node ./plugin/tests/javascript/invoice_promotions_test.cjs
+
       - name: Behat features
         id: behat
         if: ${{ !cancelled() }}

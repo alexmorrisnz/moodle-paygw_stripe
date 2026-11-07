@@ -68,6 +68,8 @@ class invoice_service {
      * @param string $component
      * @param string $paymentarea
      * @param int $itemid
+     * @param string|null $promotioncodeid Server-validated promotion ID, never a raw browser value.
+     * @param bool $promotionselected Whether the purchaser explicitly chose a code or no discount.
      * @return string Portal URL or Hosted Invoice Page
      */
     public function start_payment(
@@ -77,9 +79,14 @@ class invoice_service {
         float $cost,
         string $component,
         string $paymentarea,
-        int $itemid
+        int $itemid,
+        ?string $promotioncodeid = null,
+        bool $promotionselected = false
     ): string {
         global $USER, $CFG;
+        if ($promotioncodeid !== null && empty($config->invoicepromotioncodes)) {
+            throw new \moodle_exception('invoicepromotiondisabled', 'paygw_stripe');
+        }
         $bankcountry = null;
         if (strtolower($payable->get_currency()) === 'eur') {
             $bankcountry = strtoupper(trim((string) ($config->invoicebankcountry ?? self::DEFAULT_BANK_TRANSFER_COUNTRY)));
@@ -103,7 +110,9 @@ class invoice_service {
                 $itemid,
                 $amount,
                 $currency,
-                $USER
+                $USER,
+                $promotioncodeid,
+                $promotionselected
             );
             if ($existingurl !== null) {
                 return $existingurl;
@@ -111,6 +120,22 @@ class invoice_service {
 
             (new webhook_service($this->stripe))->ensure_invoice_events($paymentaccountid);
             $customer = (new customer_service($this->stripe))->get_invoice_customer($USER);
+            try {
+                if ($promotioncodeid !== null) {
+                    $this->validate_promotion(
+                        $promotioncodeid,
+                        $amount,
+                        $currency,
+                        $customer->id,
+                        $component,
+                        $paymentarea,
+                        $itemid
+                    );
+                }
+            } catch (\Throwable $e) {
+                (new customer_service($this->stripe))->release_invoice_identity_if_unused($userid, $customer->id);
+                throw $e;
+            }
             $now = time();
             $record = new invoice(
                 id: null,
@@ -131,6 +156,7 @@ class invoice_service {
                 timemodified: $now,
                 banktransfercountry: $bankcountry,
                 paymentmethodstatus: $bankcountry === null ? 'legacy' : 'pending',
+                promotioncodeid: $promotioncodeid,
             );
             $record = $this->repository->save($record);
             $recordlock = $this->lock($record->id);
@@ -160,6 +186,8 @@ class invoice_service {
      * @param int $amount
      * @param string $currency
      * @param object $user
+     * @param string|null $promotioncodeid Requested server-validated code.
+     * @param bool $promotionselected Whether to change an unfinished billing choice.
      * @return string|null Hosted Invoice Page, or null when a new purchase is allowed
      */
     private function existing_invoice_url(
@@ -170,7 +198,9 @@ class invoice_service {
         int $itemid,
         int $amount,
         string $currency,
-        object $user
+        object $user,
+        ?string $promotioncodeid = null,
+        bool $promotionselected = false
     ): ?string {
         while (
             $record = $this->repository->find_active_purchase(
@@ -189,6 +219,11 @@ class invoice_service {
                 if (in_array($record->status, ['cancelled', 'void', 'uncollectible', 'expired'], true) || $record->delivered) {
                     continue;
                 }
+                if ($promotionselected && $record->promotioncodeid !== $promotioncodeid) {
+                    if ($record->status !== 'billing') {
+                        throw new \moodle_exception('invoicepromotionlocked', 'paygw_stripe');
+                    }
+                }
                 if ($record->status === 'billing') {
                     if ($record->timeexpires < time()) {
                         $record->status = 'expired';
@@ -198,6 +233,21 @@ class invoice_service {
                             ->release_invoice_identity_if_unused($record->userid, $record->customerid);
                         continue;
                     }
+                    $selected = $promotionselected ? $promotioncodeid : $record->promotioncodeid;
+                    if ($selected !== null) {
+                        $this->validate_promotion(
+                            $selected,
+                            $record->amount,
+                            $record->currency,
+                            $record->customerid,
+                            $component,
+                            $paymentarea,
+                            $itemid
+                        );
+                    }
+                    // No invoice exists yet; rotating the continuation never extends the original expiry.
+                    $record->promotioncodeid = $selected;
+                    $this->repository->save($record);
                     return $this->create_billing_session_locked($record, $user);
                 }
                 if ($record->status === 'creating') {
@@ -239,6 +289,54 @@ class invoice_service {
             }
         }
         return null;
+    }
+
+    /**
+     * Revalidate a selected code before entering the Portal, never while replaying an invoice create.
+     *
+     * @param string $id Server-selected promotion code ID.
+     * @param int $amount Original amount.
+     * @param string $currency Currency.
+     * @param string $customerid Customer.
+     * @param string $component Component.
+     * @param string $paymentarea Area.
+     * @param int $itemid Item.
+     */
+    private function validate_promotion(
+        string $id,
+        int $amount,
+        string $currency,
+        string $customerid,
+        string $component,
+        string $paymentarea,
+        int $itemid
+    ): void {
+        try {
+            $product = $this->pricing->get_product($component, $paymentarea, (string)$itemid) ??
+                $this->pricing->create_product(
+                    purchase_description::get($component, $paymentarea, $itemid),
+                    $component,
+                    $paymentarea,
+                    (string)$itemid
+                );
+            (new invoice_promotion_service($this->stripe))->quote_by_id($id, $amount, $currency, $customerid, $product->id);
+        } catch (\Stripe\Exception\InvalidRequestException $e) {
+            throw new \moodle_exception(
+                'invoicepromotioninvalid',
+                'paygw_stripe',
+                '',
+                null,
+                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+            );
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            throw new \moodle_exception(
+                'invoicepromotionunavailable',
+                'paygw_stripe',
+                '',
+                null,
+                'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode()
+            );
+        }
     }
 
     /**
@@ -509,7 +607,7 @@ class invoice_service {
                 'pending_invoice_items_behavior' => 'exclude',
                 'description' => $record->description,
                 'automatic_tax' => ['enabled' => $record->automatictax],
-                'discounts' => [],
+                'discounts' => $record->promotioncodeid ? [['promotion_code' => $record->promotioncodeid]] : [],
                 'metadata' => $this->metadata($record),
             ];
 
@@ -522,7 +620,30 @@ class invoice_service {
             }
 
             // New purchases let Stripe resolve invoice defaults when finalizing.
-            $stripeinvoice = $this->stripe->invoices->create($params, $this->options($record, 'create'));
+            try {
+                $stripeinvoice = $this->stripe->invoices->create($params, $this->options($record, 'create'));
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                $discountparam = preg_match('/^(discounts?|coupon|promotion_code)(\[|$)/', (string)$e->getStripeParam()) === 1;
+                $rejected = $e->getStripeCode() === 'coupon_expired' ||
+                    ($discountparam && in_array($e->getStripeCode(), [null, 'resource_missing'], true));
+                if ($record->promotioncodeid !== null && $rejected) {
+                    // An explicit rejection created no invoice. A fresh billing session can select another code.
+                    // Never do this after a connection error or after an invoice ID has been bound.
+                    $record->status = 'billing';
+                    $record->timeconfirmed = null;
+                    $record->timemodified = time();
+                    $this->repository->save($record);
+                    throw new \moodle_exception(
+                        'invoicepromotioninvalid',
+                        'paygw_stripe',
+                        '',
+                        null,
+                        'Stripe request: ' . $e->getRequestId() . '; code: ' . $e->getStripeCode() .
+                        '; parameter: ' . $e->getStripeParam()
+                    );
+                }
+                throw $e;
+            }
             $record->invoiceid = $stripeinvoice->id;
             $this->repository->save($record);
         } else {
@@ -543,7 +664,7 @@ class invoice_service {
                     'invoice' => $record->invoiceid,
                     'pricing' => ['price' => $record->priceid],
                     'quantity' => 1,
-                    'discountable' => false,
+                    'discountable' => $record->promotioncodeid !== null,
                     'metadata' => $this->metadata($record),
                 ], $this->options($record, 'item'));
                 $record->invoiceitemid = $item->id;

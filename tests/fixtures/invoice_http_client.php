@@ -41,6 +41,12 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
     public array $products = [];
     /** @var array Price resources indexed by ID. */
     public array $prices = [];
+    /** @var array Promotion code resources indexed by ID. */
+    public array $promotioncodes = [];
+    /** @var array Coupon resources indexed by ID. */
+    public array $coupons = [];
+    /** @var array Subscription resources indexed by ID. */
+    public array $subscriptions = [];
     /** @var array Billing portal configurations indexed by ID. */
     public array $configs = [];
     /** @var array Billing portal sessions indexed by ID. */
@@ -63,6 +69,8 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
     public string $lose = '';
     /** @var string Path whose next request fails before the remote write. */
     public string $failbefore = '';
+    /** @var array|null Stripe error returned by the next invoice creation request. */
+    public ?array $invoicecreateerror = null;
     /** @var bool Whether customer requests simulate an outage. */
     public bool $customererror = false;
     /** @var bool Whether invoices are automatically paid on finalization. */
@@ -195,24 +203,76 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                         'type' => isset($params['recurring']) ? 'recurring' : 'one_time',
                         'tax_behavior' => 'unspecified'], $params);
             }
+        } else if ($resource === 'promotion_codes') {
+            if ($id) {
+                if (!isset($this->promotioncodes[$id])) {
+                    return $this->missing_resource('promotion code');
+                }
+                $response = $this->promotioncodes[$id];
+            } else {
+                $response = $this->collection(array_values(array_filter(
+                    $this->promotioncodes,
+                    static fn($code) => (!isset($params['code']) || strcasecmp($params['code'], $code['code']) === 0) &&
+                    (!isset($params['active']) || $params['active'] === $code['active'])
+                )));
+            }
+        } else if ($resource === 'coupons') {
+            if (!isset($this->coupons[$id])) {
+                return $this->missing_resource('coupon');
+            }
+            $response = $this->coupons[$id];
+        } else if ($resource === 'subscriptions' && $method === 'get') {
+            $response = $this->collection(array_values(array_filter(
+                $this->subscriptions,
+                static fn($subscription) => $subscription['customer'] === $params['customer']
+            )));
         } else if ($resource === 'invoices') {
             if ($method === 'post' && !$id) {
+                if ($this->invoicecreateerror !== null) {
+                    $error = $this->invoicecreateerror;
+                    $this->invoicecreateerror = null;
+                    return [json_encode(['error' => $error]), 400, ['Request-Id' => 'req_invoice_rejected']];
+                }
+                foreach ($params['discounts'] ?? [] as $discount) {
+                    $promotion = $this->promotioncodes[$discount['promotion_code']] ?? null;
+                    if (
+                        !$promotion || !$promotion['active'] ||
+                        (!empty($promotion['expires_at']) && $promotion['expires_at'] <= time())
+                    ) {
+                        return [json_encode(['error' => ['type' => 'invalid_request_error', 'param' => 'discounts',
+                            'message' => 'Promotion code is no longer valid']]), 400, []];
+                    }
+                }
                 $id = 'in_' . (count($this->invoices) + 1);
                 $response = $this->invoices[$id] = ['id' => $id, 'object' => 'invoice', 'status' => 'draft',
                     'total' => 0, 'amount_remaining' => 0, 'hosted_invoice_url' => null] + $params;
             } else if ($action === 'finalize') {
                 $invoice = $this->invoices[$id];
-                $total = array_sum(array_column(array_filter(
+                $invoiceitems = array_filter(
                     $this->items,
                     static fn($item) => $item['invoice'] === $id
-                ), 'amount')) + $this->tax;
+                );
+                $total = array_sum(array_column($invoiceitems, 'amount'));
+                $eligible = array_sum(array_column(array_filter(
+                    $invoiceitems,
+                    static fn($item) => $item['discountable']
+                ), 'amount'));
+                foreach ($invoice['discounts'] ?? [] as $discount) {
+                    $promotion = $this->promotioncodes[$discount['promotion_code']];
+                    $coupon = $this->coupons[$promotion['promotion']['coupon']];
+                    $reduction = $coupon['percent_off'] !== null ? (int)round($eligible * $coupon['percent_off'] / 100) :
+                        (int)($coupon['currency_options'][$invoice['currency']]['amount_off'] ?? $coupon['amount_off']);
+                    $total -= min($eligible, $reduction);
+                }
+                $total += $this->tax;
+                $paid = $this->autopaid || $total === 0;
                 $response = $this->invoices[$id] = array_replace($invoice, [
-                    'status' => $this->autopaid ? 'paid' : 'open', 'total' => $total,
-                    'amount_remaining' => $this->autopaid ? 0 : $total,
+                    'status' => $paid ? 'paid' : 'open', 'total' => $total,
+                    'amount_remaining' => $paid ? 0 : $total,
                     'hosted_invoice_url' => 'https://invoice.stripe.com/' . $id,
                     'customer_email' => $this->customers[$invoice['customer']]['email'],
                 ]);
-                if (!$this->autopaid) {
+                if (!$paid) {
                     $intentid = 'pi_' . $id;
                     $this->paymentintents[$intentid] = ['id' => $intentid, 'object' => 'payment_intent',
                         'customer' => $invoice['customer'], 'currency' => $invoice['currency'],
@@ -234,6 +294,12 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
                     throw new \RuntimeException('Cannot send an unfinalized invoice');
                 }
                 $this->sent[] = ['invoiceid' => $id, 'email' => $response['customer_email'], 'key' => $key];
+            } else if (!$id && $method === 'get') {
+                $response = $this->collection(array_values(array_filter(
+                    $this->invoices,
+                    static fn($invoice) => $invoice['customer'] === $params['customer'] &&
+                    (!isset($params['status']) || $invoice['status'] === $params['status'])
+                )));
             } else {
                 $response = $this->invoices[$id];
             }
@@ -251,7 +317,10 @@ final class invoice_http_client implements \Stripe\HttpClient\ClientInterface {
             unset($payment);
             $response = $this->collection($payments);
         } else if ($resource === 'payment_intents' && $method === 'get') {
-            $response = $this->paymentintents[$id];
+            $response = $id ? $this->paymentintents[$id] : $this->collection(array_values(array_filter(
+                $this->paymentintents,
+                static fn($intent) => $intent['customer'] === $params['customer']
+            )));
         } else if ($resource === 'invoiceitems') {
             $id = 'ii_' . (count($this->items) + 1);
             $response = $this->items[$id] = ['id' => $id, 'object' => 'invoiceitem',

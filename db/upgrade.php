@@ -405,5 +405,25 @@ function xmldb_paygw_stripe_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026102700, 'paygw', 'stripe');
     }
 
+    if ($oldversion < 2026102900) {
+        $table = new xmldb_table('paygw_stripe_invoices');
+        // Null preserves parameters of existing and uncertain invoice requests.
+        $field = new xmldb_field('promotioncodeid', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'paymentmethods');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2026102900, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026110500) {
+        // Refresh registrations after removing the prototype's output hook and AJAX function.
+        upgrade_plugin_savepoint(true, 2026110500, 'paygw', 'stripe');
+    }
+
+    if ($oldversion < 2026110501) {
+        // Register the simplified popup editor and its AJAX endpoint.
+        upgrade_plugin_savepoint(true, 2026110501, 'paygw', 'stripe');
+    }
+
     return true;
 }

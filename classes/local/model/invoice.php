@@ -62,6 +62,7 @@ final class invoice implements mappable_model {
      * @param string|null $banktransfercountry EUR bank country snapshot; null for legacy or non-EUR purchases.
      * @param string $paymentmethodstatus Legacy, pending, applying or ready payment configuration.
      * @param string|null $paymentmethods JSON snapshot of resolved Stripe methods plus bank transfer.
+     * @param string|null $promotioncodeid Validated Stripe promotion code bound before invoice creation.
      */
     public function __construct(
         /** @var int|null */
@@ -126,6 +127,8 @@ final class invoice implements mappable_model {
         public string $paymentmethodstatus = 'legacy',
         /** @var string|null */
         public ?string $paymentmethods = null,
+        /** @var string|null */
+        public ?string $promotioncodeid = null,
     ) {
     }
 
@@ -167,6 +170,7 @@ final class invoice implements mappable_model {
             banktransfercountry: self::nullable_string_field($record, 'banktransfercountry'),
             paymentmethodstatus: (string)($record->paymentmethodstatus ?? 'legacy'),
             paymentmethods: self::nullable_string_field($record, 'paymentmethods'),
+            promotioncodeid: self::nullable_string_field($record, 'promotioncodeid'),
         );
     }
 

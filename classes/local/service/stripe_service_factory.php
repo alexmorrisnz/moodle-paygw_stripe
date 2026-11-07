@@ -117,6 +117,14 @@ final class stripe_service_factory {
     }
 
     /**
+     * Create the invoice promotion-code validator.
+     * @return invoice_promotion_service
+     */
+    public function invoice_promotion_service(): invoice_promotion_service {
+        return new invoice_promotion_service($this->stripe_client());
+    }
+
+    /**
      * Create the restricted billing-details Portal service.
      * @return customer_portal_service
      */
